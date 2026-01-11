@@ -1,0 +1,10 @@
+{
+  "id": "com.arman.coffeeiptv",
+  "version": "0.0.1",
+  "vendor": "Arman",
+  "type": "web",
+  "main": "index.html",
+  "title": "Coffee IPTV",
+  "icon": "icons/icon.png",
+  "largeIcon": "icons/largeIcon.png"
+}

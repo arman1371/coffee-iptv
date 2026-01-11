@@ -1,0 +1,40 @@
+{
+  "name": "coffee-iptv",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "test": "vitest run",
+    "coverage": "vitest run --coverage",
+    "build": "tsc -b && vite build",
+    "prepackage": "npm run build",
+    "package": "ares-package -n -o dist dist",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "hls.js": "^1.6.13",
+    "preact": "^10.27.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.34.0",
+    "@preact/preset-vite": "^2.10.2",
+    "@testing-library/preact": "^3.2.4",
+    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/ui": "^3.2.4",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9.34.0",
+    "eslint-config-preact": "^2.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "jsdom": "^26.1.0",
+    "postcss": "^8.5.6",
+    "prettier": "^3.6.2",
+    "prettier-plugin-tailwindcss": "^0.6.14",
+    "tailwindcss": "^3.4.18",
+    "typescript": "~5.8.3",
+    "typescript-eslint": "^8.41.0",
+    "vite": "^7.1.2",
+    "vite-plugin-checker": "^0.10.3",
+    "vitest": "^3.2.4"
+  }
+}
