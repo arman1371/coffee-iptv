@@ -119,7 +119,7 @@ describe("config-factory", () => {
       const manager = createConfigManager();
 
       // Should be able to call initialize
-      await expect(manager.initialize()).resolves.not.toThrow();
+      await expect(manager.initialize()).resolves.toBeUndefined();
     });
 
     it("should create manager with functional methods", async () => {
@@ -149,14 +149,12 @@ describe("config-factory", () => {
 
       // If it's a ConfigManager (production), it will have setConfig methods
       if ("setDebugMode" in manager) {
-        await expect(
-          (manager as IConfigManager & { setDebugMode: (enabled: boolean) => Promise<void> }).setDebugMode(true)
-        ).resolves.not.toThrow();
+        await (manager as IConfigManager & { setDebugMode: (enabled: boolean) => Promise<void> }).setDebugMode(true);
+        expect(manager).toBeDefined();
       }
       if ("setM3uUrl" in manager) {
-        await expect(
-          (manager as IConfigManager & { setM3uUrl: (url: string) => Promise<void> }).setM3uUrl("https://example.com/playlist.m3u")
-        ).resolves.not.toThrow();
+        await (manager as IConfigManager & { setM3uUrl: (url: string) => Promise<void> }).setM3uUrl("https://example.com/playlist.m3u");
+        expect(manager).toBeDefined();
       }
     });
 
@@ -176,7 +174,7 @@ describe("config-factory", () => {
   describe("integration tests", () => {
     it("should work with the singleton instance", async () => {
       // Should be able to use the exported singleton
-      await expect(configManager.initialize()).resolves.not.toThrow();
+      await expect(configManager.initialize()).resolves.toBeUndefined();
       await expect(configManager.isDebugMode()).resolves.toBeDefined();
       await expect(configManager.getM3uUrl()).resolves.toBeDefined();
     });
@@ -215,7 +213,7 @@ describe("config-factory", () => {
       expect(manager).toBeDefined();
 
       // Should have all required methods
-      await expect(manager.initialize()).resolves.not.toThrow();
+      await expect(manager.initialize()).resolves.toBeUndefined();
     });
 
     it("should export singleton with correct type", () => {
@@ -306,7 +304,7 @@ describe("config-factory", () => {
 
       for (const manager of managers) {
         // All should implement the IConfigManager interface
-        await expect(manager.initialize()).resolves.not.toThrow();
+        await expect(manager.initialize()).resolves.toBeUndefined();
         expect(typeof (await manager.isDebugMode())).toBe("boolean");
         expect(typeof (await manager.getM3uUrl())).toBe("string");
       }
@@ -327,10 +325,10 @@ describe("config-factory", () => {
       const manager = createConfigManager();
 
       // Should not throw on first initialization
-      await expect(manager.initialize()).resolves.not.toThrow();
+      await expect(manager.initialize()).resolves.toBeUndefined();
 
       // Should handle multiple initializations
-      await expect(manager.initialize()).resolves.not.toThrow();
+      await expect(manager.initialize()).resolves.toBeUndefined();
     });
   });
 });
