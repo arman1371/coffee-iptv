@@ -14,12 +14,9 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test-setup.ts"],
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
     coverage: {
       provider: "v8",
-      reporter: ['html', 'lcov'],
-      include: ['src/**/*.{ts,tsx}'],
-      exclude: ['**/*.test.ts', '**/*.test.tsx', '**/test-setup.ts', '**/vite-env.d.ts', '**/webos-types.d.ts']
+      reporter: ['html', 'lcov']
     },
   },
 });
