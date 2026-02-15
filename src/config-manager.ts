@@ -5,8 +5,8 @@ import { DatabaseManager, type DB8Object } from "./database-manager";
 
 export interface AppConfig {
   debugMode: boolean;
-  m3uUrl: string;
-  [key: string]: string | boolean; // Index signature to allow dynamic property access
+  m3uUrls: string[];
+  [key: string]: string | boolean | string[]; // Index signature to allow dynamic property access
 }
 
 export interface ConfigEntry extends DB8Object {
@@ -19,7 +19,7 @@ export interface ConfigEntry extends DB8Object {
 // Shared default configuration values
 export const DEFAULT_CONFIG: AppConfig = {
   debugMode: false,
-  m3uUrl: "",
+  m3uUrls: [],
 };
 
 // Interface for config manager implementations
@@ -33,8 +33,8 @@ export interface IConfigManager {
   getAllConfig(): Promise<AppConfig>;
   isDebugMode(): Promise<boolean>;
   setDebugMode?(enabled: boolean): Promise<void>;
-  getM3uUrl(): Promise<string>;
-  setM3uUrl?(url: string): Promise<void>;
+  getM3uUrls(): Promise<string[]>;
+  setM3uUrls?(urls: string[]): Promise<void>;
 }
 
 export class ConfigManager implements IConfigManager {
@@ -49,6 +49,7 @@ export class ConfigManager implements IConfigManager {
 
   /**
    * Initialize the config manager by creating the config kind if it doesn't exist
+   * Also migrates old m3uUrl format to m3uUrls array if needed
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) {
@@ -66,11 +67,17 @@ export class ConfigManager implements IConfigManager {
 
       await this.dbManager.putKind(configKind);
       this.isInitialized = true;
+      
+      // Migrate old m3uUrl to m3uUrls if needed
+      await this.migrateOldConfig();
     } catch (error) {
       // If kind already exists, that's okay
       if (error && typeof error === "object" && "errorCode" in error) {
         // Kind might already exist, which is fine
         this.isInitialized = true;
+        
+        // Still try to migrate
+        await this.migrateOldConfig();
       } else {
         throw new Error(`Failed to initialize ConfigManager: ${error}`);
       }
@@ -79,6 +86,7 @@ export class ConfigManager implements IConfigManager {
 
   /**
    * Get a configuration value by key
+   * For array values, deserializes from JSON string
    */
   async getConfig<K extends keyof AppConfig>(key: K): Promise<AppConfig[K]> {
     await this.ensureInitialized();
@@ -92,7 +100,19 @@ export class ConfigManager implements IConfigManager {
 
       if (result.returnValue && result.results && result.results.length > 0) {
         const configEntry = result.results[0] as ConfigEntry;
-        return configEntry.value as AppConfig[K];
+        const value = configEntry.value;
+        
+        // Deserialize JSON strings back to arrays
+        if (typeof value === 'string' && key === 'm3uUrls') {
+          try {
+            return JSON.parse(value) as AppConfig[K];
+          } catch {
+            // If parsing fails, return default
+            return DEFAULT_CONFIG[key];
+          }
+        }
+        
+        return value as AppConfig[K];
       }
 
       // Return default value if not found
@@ -105,6 +125,7 @@ export class ConfigManager implements IConfigManager {
 
   /**
    * Set a configuration value by key
+   * For array values, serializes to JSON string
    */
   async setConfig<K extends keyof AppConfig>(
     key: K,
@@ -120,10 +141,13 @@ export class ConfigManager implements IConfigManager {
 
       const existingResult = await this.dbManager.find(existingQuery);
 
+      // Serialize arrays to JSON strings for DB8 storage
+      const serializedValue = Array.isArray(value) ? JSON.stringify(value) : value;
+
       const configEntry: ConfigEntry = {
         _kind: this.configKindId,
         key: key as string,
-        value,
+        value: serializedValue as string | boolean,
         updatedAt: new Date().toISOString(),
       };
 
@@ -160,8 +184,19 @@ export class ConfigManager implements IConfigManager {
         for (const item of result.results) {
           const configEntry = item as ConfigEntry;
           if (configEntry.key in config) {
-            (config as Record<string, unknown>)[configEntry.key] =
-              configEntry.value;
+            const value = configEntry.value;
+            
+            // Deserialize JSON strings back to arrays for m3uUrls
+            if (typeof value === 'string' && configEntry.key === 'm3uUrls') {
+              try {
+                (config as Record<string, unknown>)[configEntry.key] = JSON.parse(value);
+              } catch {
+                // If parsing fails, use default
+                (config as Record<string, unknown>)[configEntry.key] = DEFAULT_CONFIG[configEntry.key as keyof AppConfig];
+              }
+            } else {
+              (config as Record<string, unknown>)[configEntry.key] = value;
+            }
           }
         }
       }
@@ -188,17 +223,60 @@ export class ConfigManager implements IConfigManager {
   }
 
   /**
-   * Get M3U URL (convenience method)
+   * Get M3U URLs (convenience method)
    */
-  async getM3uUrl(): Promise<string> {
-    return await this.getConfig("m3uUrl");
+  async getM3uUrls(): Promise<string[]> {
+    return await this.getConfig("m3uUrls");
   }
 
   /**
-   * Set M3U URL (convenience method)
+   * Set M3U URLs (convenience method)
+   * Filters out empty URLs and enforces max 10 limit
    */
-  async setM3uUrl(url: string): Promise<void> {
-    await this.setConfig("m3uUrl", url);
+  async setM3uUrls(urls: string[]): Promise<void> {
+    // Filter out empty/whitespace URLs and trim
+    const cleanedUrls = urls
+      .map(url => url.trim())
+      .filter(url => url !== '')
+      .slice(0, 10); // Enforce max 10 URLs
+    
+    await this.setConfig("m3uUrls", cleanedUrls);
+  }
+
+  /**
+   * Migrate old m3uUrl config to m3uUrls array
+   */
+  private async migrateOldConfig(): Promise<void> {
+    try {
+      const query = this.dbManager.createQuery(this.configKindId, [
+        { prop: "key", op: "=", val: "m3uUrl" },
+      ]);
+
+      const result = await this.dbManager.find(query);
+
+      if (result.returnValue && result.results && result.results.length > 0) {
+        const oldConfigEntry = result.results[0] as ConfigEntry;
+        const oldUrl = oldConfigEntry.value;
+        
+        // Only migrate if old URL exists, is a string, and is not empty
+        if (oldUrl && typeof oldUrl === 'string' && oldUrl.trim() !== '') {
+          // Check if m3uUrls already exists
+          const newQuery = this.dbManager.createQuery(this.configKindId, [
+            { prop: "key", op: "=", val: "m3uUrls" },
+          ]);
+          const newResult = await this.dbManager.find(newQuery);
+          
+          // Only migrate if m3uUrls doesn't exist yet
+          if (!newResult.returnValue || !newResult.results || newResult.results.length === 0) {
+            await this.setM3uUrls([oldUrl]);
+            console.log('Migrated old m3uUrl to m3uUrls array');
+          }
+        }
+      }
+    } catch (error) {
+      // Migration failure is not critical, just log it
+      console.warn('Failed to migrate old config:', error);
+    }
   }
 
   /**

@@ -210,6 +210,91 @@ export class M3UManager {
   }
 
   /**
+   * Download and merge multiple M3U playlists
+   * Downloads all URLs in parallel, merges channels, and deduplicates by URL
+   */
+  async downloadAndMergeMultipleM3U(
+    urls: string[],
+    timeout?: number
+  ): Promise<M3UParseResult> {
+    // Filter out empty/whitespace URLs
+    const cleanUrls = urls
+      .map(url => url.trim())
+      .filter(url => url !== '');
+
+    if (cleanUrls.length === 0) {
+      return {
+        success: false,
+        error: 'No valid URLs provided',
+      };
+    }
+
+    // Download all playlists in parallel using Promise.allSettled
+    const downloadPromises = cleanUrls.map(url => 
+      this.downloadAndParseM3U(url, timeout)
+    );
+
+    const results = await Promise.allSettled(downloadPromises);
+
+    // Extract successful playlists
+    const successfulPlaylists: M3UPlaylist[] = [];
+    const failedUrls: string[] = [];
+
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled' && result.value.success && result.value.playlist) {
+        successfulPlaylists.push(result.value.playlist);
+      } else {
+        failedUrls.push(cleanUrls[index]);
+      }
+    });
+
+    // If all URLs failed, return error
+    if (successfulPlaylists.length === 0) {
+      return {
+        success: false,
+        error: `All playlist downloads failed. Failed URLs: ${failedUrls.join(', ')}`,
+      };
+    }
+
+    // Merge playlists with deduplication by channel URL
+    const seenUrls = new Set<string>();
+    const mergedChannels: M3UChannel[] = [];
+    const allGroups = new Set<string>();
+
+    // Process playlists in order (first URL has priority for duplicates)
+    for (const playlist of successfulPlaylists) {
+      for (const channel of playlist.channels) {
+        // Deduplicate by channel URL
+        if (!seenUrls.has(channel.url)) {
+          seenUrls.add(channel.url);
+          mergedChannels.push(channel);
+        }
+        
+        // Collect all unique groups
+        if (channel.group) {
+          allGroups.add(channel.group);
+        }
+      }
+    }
+
+    // Create merged playlist
+    const mergedPlaylist: M3UPlaylist = {
+      channels: mergedChannels,
+      metadata: {
+        totalChannels: mergedChannels.length,
+        groups: Array.from(allGroups).sort(),
+        parsedAt: new Date().toISOString(),
+        sourceUrl: `Merged from ${successfulPlaylists.length} playlist(s)`,
+      },
+    };
+
+    return {
+      success: true,
+      playlist: mergedPlaylist,
+    };
+  }
+
+  /**
    * Get channels filtered by group
    */
   getChannelsByGroup(playlist: M3UPlaylist, groupName: string): M3UChannel[] {

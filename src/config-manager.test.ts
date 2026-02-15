@@ -187,11 +187,11 @@ describe("ConfigManager", () => {
 
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-      const result = await testConfigManager.getConfig("m3uUrl");
+      const result = await testConfigManager.getConfig("m3uUrls");
 
-      expect(result).toBe(""); // default value
+      expect(result).toEqual([]); // default value for m3uUrls
       expect(consoleSpy).toHaveBeenCalledWith(
-        "Failed to get config 'm3uUrl', using default:",
+        "Failed to get config 'm3uUrls', using default:",
         mockError
       );
 
@@ -304,8 +304,8 @@ describe("ConfigManager", () => {
         {
           _kind: "com.arman.coffeeiptv.config:1",
           _id: "config2",
-          key: "m3uUrl",
-          value: "https://example.com/playlist.m3u",
+          key: "m3uUrls",
+          value: JSON.stringify(["https://example.com/playlist.m3u"]),
           updatedAt: "2025-08-31T12:00:00Z",
         },
       ];
@@ -332,7 +332,7 @@ describe("ConfigManager", () => {
 
       expect(result).toEqual({
         debugMode: true,
-        m3uUrl: "https://example.com/playlist.m3u",
+        m3uUrls: ["https://example.com/playlist.m3u"],
       });
     });
 
@@ -360,7 +360,7 @@ describe("ConfigManager", () => {
 
       expect(result).toEqual({
         debugMode: false,
-        m3uUrl: "",
+        m3uUrls: [],
       });
     });
   });
@@ -417,7 +417,7 @@ describe("ConfigManager", () => {
     it("should handle M3U URL methods", async () => {
       const mockQuery: DB8Query = {
         from: "com.arman.coffeeiptv.config:1",
-        where: [{ prop: "key", op: "=", val: "m3uUrl" }],
+        where: [{ prop: "key", op: "=", val: "m3uUrls" }],
       };
       const mockResponse: DB8SuccessResponse = {
         returnValue: true,
@@ -425,8 +425,8 @@ describe("ConfigManager", () => {
           {
             _kind: "com.arman.coffeeiptv.config:1",
             _id: "config2",
-            key: "m3uUrl",
-            value: "https://example.com/playlist.m3u",
+            key: "m3uUrls",
+            value: JSON.stringify(["https://example.com/playlist.m3u"]),
             updatedAt: "2025-08-31T12:00:00Z",
           },
         ],
@@ -435,8 +435,8 @@ describe("ConfigManager", () => {
       vi.mocked(mockDatabaseManager.createQuery).mockReturnValue(mockQuery);
       vi.mocked(mockDatabaseManager.find).mockResolvedValue(mockResponse);
 
-      const url = await testConfigManager.getM3uUrl();
-      expect(url).toBe("https://example.com/playlist.m3u");
+      const urls = await testConfigManager.getM3uUrls();
+      expect(urls).toEqual(["https://example.com/playlist.m3u"]);
 
       vi.mocked(mockDatabaseManager.find).mockResolvedValue({
         returnValue: true,
@@ -446,7 +446,7 @@ describe("ConfigManager", () => {
         returnValue: true,
       });
 
-      await testConfigManager.setM3uUrl("https://new-url.com/playlist.m3u");
+      await testConfigManager.setM3uUrls(["https://new-url.com/playlist.m3u"]);
       expect(mockDatabaseManager.put).toHaveBeenCalled();
     });
   });

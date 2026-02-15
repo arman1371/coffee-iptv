@@ -63,10 +63,10 @@ export class DevConfigManager implements IConfigManager {
   }
 
   /**
-   * Get M3U URL (convenience method)
+   * Get M3U URLs (convenience method)
    */
-  async getM3uUrl(): Promise<string> {
-    return await this.getConfig("m3uUrl");
+  async getM3uUrls(): Promise<string[]> {
+    return await this.getConfig("m3uUrls");
   }
 
   /**

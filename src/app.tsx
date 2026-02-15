@@ -60,22 +60,15 @@ export function App() {
       setLoading(true);
       setError(null);
 
-      // Initialize config manager and get M3U URL
+      // Initialize config manager and get M3U URLs
       await configManager.initialize();
-      const m3uUrl = await configManager.getM3uUrl();
+      const m3uUrls = await configManager.getM3uUrls();
 
-      if (!m3uUrl || m3uUrl.trim() === "") {
-        setError(
-          "No M3U URL configured. Please set up your playlist URL in settings."
-        );
-        return;
-      }
-
-      // Download and parse M3U playlist
-      const result = await m3uManager.downloadAndParseM3U(m3uUrl);
+      // Download and merge all M3U playlists (filtering handled by m3uManager)
+      const result = await m3uManager.downloadAndMergeMultipleM3U(m3uUrls);
 
       if (!result.success || !result.playlist) {
-        setError(result.error || "Failed to load playlist");
+        setError(result.error || "Failed to load playlists");
         return;
       }
 

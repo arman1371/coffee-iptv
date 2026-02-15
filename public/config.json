@@ -1,4 +1,4 @@
 {
   "debugMode": false,
-  "m3uUrl": "https://iptv-org.github.io/iptv/categories/animation.m3u"
+  "m3uUrls": ["https://iptv-org.github.io/iptv/categories/animation.m3u"]
 }
