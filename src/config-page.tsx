@@ -1,5 +1,5 @@
 import { useState, useEffect } from "preact/hooks";
-import { configManager, type AppConfig } from "./config-manager";
+import { configManager, type AppConfig, type PlaylistUrl } from "./config-manager";
 
 export function ConfigPage() {
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -61,14 +61,14 @@ export function ConfigPage() {
     }
   };
 
-  const handleInputChange = (key: keyof AppConfig, value: string | boolean | string[]) => {
+  const handleInputChange = (key: keyof AppConfig, value: string | boolean | PlaylistUrl[]) => {
     if (!config) return;
     setConfig({ ...config, [key]: value });
   };
 
   const handleAddUrl = () => {
     if (!config || config.m3uUrls.length >= 10) return;
-    const newUrls = [...config.m3uUrls, ""];
+    const newUrls = [...config.m3uUrls, { url: "", enabled: true }];
     handleInputChange("m3uUrls", newUrls);
   };
 
@@ -81,7 +81,14 @@ export function ConfigPage() {
   const handleUrlChange = (index: number, value: string) => {
     if (!config) return;
     const newUrls = [...config.m3uUrls];
-    newUrls[index] = value;
+    newUrls[index] = { ...newUrls[index], url: value };
+    handleInputChange("m3uUrls", newUrls);
+  };
+
+  const handleToggleUrl = (index: number) => {
+    if (!config) return;
+    const newUrls = [...config.m3uUrls];
+    newUrls[index] = { ...newUrls[index], enabled: !newUrls[index].enabled };
     handleInputChange("m3uUrls", newUrls);
   };
 
@@ -145,21 +152,36 @@ export function ConfigPage() {
                 </p>
               ) : (
                 <div className="mb-4 space-y-3">
-                  {config?.m3uUrls.map((url, index) => (
-                    <div key={index} className="flex gap-2">
+                  {config?.m3uUrls.map((item, index) => (
+                    <div key={index} className="flex gap-2 items-center">
                       <input
                         type="url"
-                        value={url}
+                        value={item.url}
                         onChange={(e) =>
                           handleUrlChange(index, (e.target as HTMLInputElement).value)
                         }
                         placeholder="https://example.com/playlist.m3u"
-                        className="flex-1 rounded-md border bg-gray-700 p-3"
+                        className={`flex-1 rounded-md border bg-gray-700 p-3 ${
+                          !item.enabled ? "opacity-60" : ""
+                        }`}
                       />
                       <button
                         type="button"
+                        onClick={() => handleToggleUrl(index)}
+                        className={`flex-shrink-0 px-4 py-3 rounded-md font-medium ${
+                          item.enabled
+                            ? "bg-green-600 hover:bg-green-500"
+                            : "bg-gray-600 hover:bg-gray-500"
+                        }`}
+                        disabled={saving}
+                        title={item.enabled ? "Enabled" : "Disabled"}
+                      >
+                        {item.enabled ? "Disable" : "Enable"}
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => handleRemoveUrl(index)}
-                        className="cursor-pointer rounded-md bg-red-600 px-4 hover:bg-red-500"
+                        className="cursor-pointer rounded-md bg-red-600 px-4 py-3 hover:bg-red-500"
                         disabled={saving}
                       >
                         Remove

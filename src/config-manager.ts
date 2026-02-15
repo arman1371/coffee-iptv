@@ -3,10 +3,15 @@
 
 import { DatabaseManager, type DB8Object } from "./database-manager";
 
+export interface PlaylistUrl {
+  url: string;
+  enabled: boolean;
+}
+
 export interface AppConfig {
   debugMode: boolean;
-  m3uUrls: string[];
-  [key: string]: string | boolean | string[]; // Index signature to allow dynamic property access
+  m3uUrls: PlaylistUrl[];
+  [key: string]: string | boolean | PlaylistUrl[]; // Index signature to allow dynamic property access
 }
 
 export interface ConfigEntry extends DB8Object {
@@ -33,8 +38,8 @@ export interface IConfigManager {
   getAllConfig(): Promise<AppConfig>;
   isDebugMode(): Promise<boolean>;
   setDebugMode?(enabled: boolean): Promise<void>;
-  getM3uUrls(): Promise<string[]>;
-  setM3uUrls?(urls: string[]): Promise<void>;
+  getM3uUrls(): Promise<PlaylistUrl[]>;
+  setM3uUrls?(urls: PlaylistUrl[] | string[]): Promise<void>;
 }
 
 export class ConfigManager implements IConfigManager {
@@ -225,19 +230,28 @@ export class ConfigManager implements IConfigManager {
   /**
    * Get M3U URLs (convenience method)
    */
-  async getM3uUrls(): Promise<string[]> {
+  async getM3uUrls(): Promise<PlaylistUrl[]> {
     return await this.getConfig("m3uUrls");
   }
 
   /**
    * Set M3U URLs (convenience method)
    * Filters out empty URLs and enforces max 10 limit
+   * Accepts both PlaylistUrl[] and string[] for backward compatibility
    */
-  async setM3uUrls(urls: string[]): Promise<void> {
+  async setM3uUrls(urls: PlaylistUrl[] | string[]): Promise<void> {
+    // Normalize to PlaylistUrl[] format
+    const playlistUrls: PlaylistUrl[] = urls.map(item => {
+      if (typeof item === 'string') {
+        return { url: item, enabled: true };
+      }
+      return item;
+    });
+
     // Filter out empty/whitespace URLs and trim
-    const cleanedUrls = urls
-      .map(url => url.trim())
-      .filter(url => url !== '')
+    const cleanedUrls = playlistUrls
+      .map(item => ({ ...item, url: item.url.trim() }))
+      .filter(item => item.url !== '')
       .slice(0, 10); // Enforce max 10 URLs
     
     await this.setConfig("m3uUrls", cleanedUrls);
@@ -268,7 +282,7 @@ export class ConfigManager implements IConfigManager {
           
           // Only migrate if m3uUrls doesn't exist yet
           if (!newResult.returnValue || !newResult.results || newResult.results.length === 0) {
-            await this.setM3uUrls([oldUrl]);
+            await this.setM3uUrls([{ url: oldUrl, enabled: true }]);
             console.log('Migrated old m3uUrl to m3uUrls array');
           }
         }

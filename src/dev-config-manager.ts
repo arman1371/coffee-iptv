@@ -4,6 +4,7 @@
 import {
   type IConfigManager,
   type AppConfig,
+  type PlaylistUrl,
   DEFAULT_CONFIG,
 } from "./config-manager";
 
@@ -65,7 +66,7 @@ export class DevConfigManager implements IConfigManager {
   /**
    * Get M3U URLs (convenience method)
    */
-  async getM3uUrls(): Promise<string[]> {
+  async getM3uUrls(): Promise<PlaylistUrl[]> {
     return await this.getConfig("m3uUrls");
   }
 

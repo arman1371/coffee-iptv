@@ -64,8 +64,13 @@ export function App() {
       await configManager.initialize();
       const m3uUrls = await configManager.getM3uUrls();
 
+      // Filter to get only enabled URLs (filtering of empty URLs handled by m3uManager)
+      const enabledUrls = m3uUrls
+        .filter(item => item.enabled)
+        .map(item => item.url);
+
       // Download and merge all M3U playlists (filtering handled by m3uManager)
-      const result = await m3uManager.downloadAndMergeMultipleM3U(m3uUrls);
+      const result = await m3uManager.downloadAndMergeMultipleM3U(enabledUrls);
 
       if (!result.success || !result.playlist) {
         setError(result.error || "Failed to load playlists");

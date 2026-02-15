@@ -305,7 +305,7 @@ describe("ConfigManager", () => {
           _kind: "com.arman.coffeeiptv.config:1",
           _id: "config2",
           key: "m3uUrls",
-          value: JSON.stringify(["https://example.com/playlist.m3u"]),
+          value: JSON.stringify([{ url: "https://example.com/playlist.m3u", enabled: true }]),
           updatedAt: "2025-08-31T12:00:00Z",
         },
       ];
@@ -332,7 +332,7 @@ describe("ConfigManager", () => {
 
       expect(result).toEqual({
         debugMode: true,
-        m3uUrls: ["https://example.com/playlist.m3u"],
+        m3uUrls: [{ url: "https://example.com/playlist.m3u", enabled: true }],
       });
     });
 
@@ -426,7 +426,7 @@ describe("ConfigManager", () => {
             _kind: "com.arman.coffeeiptv.config:1",
             _id: "config2",
             key: "m3uUrls",
-            value: JSON.stringify(["https://example.com/playlist.m3u"]),
+            value: JSON.stringify([{ url: "https://example.com/playlist.m3u", enabled: true }]),
             updatedAt: "2025-08-31T12:00:00Z",
           },
         ],
@@ -436,7 +436,7 @@ describe("ConfigManager", () => {
       vi.mocked(mockDatabaseManager.find).mockResolvedValue(mockResponse);
 
       const urls = await testConfigManager.getM3uUrls();
-      expect(urls).toEqual(["https://example.com/playlist.m3u"]);
+      expect(urls).toEqual([{ url: "https://example.com/playlist.m3u", enabled: true }]);
 
       vi.mocked(mockDatabaseManager.find).mockResolvedValue({
         returnValue: true,
@@ -446,7 +446,7 @@ describe("ConfigManager", () => {
         returnValue: true,
       });
 
-      await testConfigManager.setM3uUrls(["https://new-url.com/playlist.m3u"]);
+      await testConfigManager.setM3uUrls([{ url: "https://new-url.com/playlist.m3u", enabled: false }]);
       expect(mockDatabaseManager.put).toHaveBeenCalled();
     });
   });
