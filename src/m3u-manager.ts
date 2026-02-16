@@ -169,7 +169,7 @@ export class M3UManager {
         channels,
         metadata: {
           totalChannels: channels.length,
-          groups: Array.from(groups).sort(),
+          groups: Array.from(groups).sort((a, b) => a.localeCompare(b)),
           parsedAt: new Date().toISOString(),
           sourceUrl,
         },
@@ -282,7 +282,7 @@ export class M3UManager {
       channels: mergedChannels,
       metadata: {
         totalChannels: mergedChannels.length,
-        groups: Array.from(allGroups).sort(),
+        groups: Array.from(allGroups).sort((a, b) => a.localeCompare(b)),
         parsedAt: new Date().toISOString(),
         sourceUrl: `Merged from ${successfulPlaylists.length} playlist(s)`,
       },
