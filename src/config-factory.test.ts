@@ -3,12 +3,13 @@ import { createConfigManager, configManager } from "./config-factory";
 import type { IConfigManager } from "./config-manager";
 
 // Mock fetch for DevConfigManager tests
-globalThis.fetch = vi.fn(() =>
+const mockFetch = vi.fn(() =>
   Promise.resolve({
     ok: true,
-    json: () => Promise.resolve({ debugMode: false, m3uUrl: "" }),
+    json: () => Promise.resolve({ debugMode: false, m3uUrls: [] }),
   } as Response)
 );
+globalThis.fetch = mockFetch as typeof fetch;
 
 describe("config-factory", () => {
   let consoleLogSpy: ReturnType<typeof vi.spyOn>;
@@ -17,7 +18,7 @@ describe("config-factory", () => {
     // Spy on console.log
     consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     // Reset fetch mock
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockClear();
+    mockFetch.mockClear();
   });
 
   afterEach(() => {
@@ -52,8 +53,8 @@ describe("config-factory", () => {
       expect(typeof manager.getAllConfig).toBe("function");
       expect(typeof manager.isDebugMode).toBe("function");
       // Note: DevConfigManager doesn't have setDebugMode (read-only in dev)
-      expect(typeof manager.getM3uUrl).toBe("function");
-      // Note: DevConfigManager doesn't have setM3uUrl (read-only in dev)
+      expect(typeof manager.getM3uUrls).toBe("function");
+      // Note: DevConfigManager doesn't have setM3uUrls (read-only in dev)
     });
 
     it("should handle multiple sequential createConfigManager calls", () => {
@@ -90,8 +91,8 @@ describe("config-factory", () => {
       expect(configManager).toHaveProperty("getAllConfig");
       expect(configManager).toHaveProperty("isDebugMode");
       // Note: DevConfigManager doesn't have setDebugMode (read-only in dev)
-      expect(configManager).toHaveProperty("getM3uUrl");
-      // Note: DevConfigManager doesn't have setM3uUrl (read-only in dev)
+      expect(configManager).toHaveProperty("getM3uUrls");
+      // Note: DevConfigManager doesn't have setM3uUrls (read-only in dev)
     });
 
     it("should be the same instance as default export", async () => {
@@ -132,8 +133,8 @@ describe("config-factory", () => {
       const debugMode = await manager.isDebugMode();
       expect(typeof debugMode).toBe("boolean");
 
-      const m3uUrl = await manager.getM3uUrl();
-      expect(typeof m3uUrl).toBe("string");
+      const m3uUrls = await manager.getM3uUrls();
+      expect(Array.isArray(m3uUrls)).toBe(true);
 
       const allConfig = await manager.getAllConfig();
       expect(typeof allConfig).toBe("object");
@@ -152,8 +153,8 @@ describe("config-factory", () => {
         await (manager as IConfigManager & { setDebugMode: (enabled: boolean) => Promise<void> }).setDebugMode(true);
         expect(manager).toBeDefined();
       }
-      if ("setM3uUrl" in manager) {
-        await (manager as IConfigManager & { setM3uUrl: (url: string) => Promise<void> }).setM3uUrl("https://example.com/playlist.m3u");
+      if ("setM3uUrls" in manager) {
+        await (manager as IConfigManager & { setM3uUrls: (urls: Array<{ url: string; enabled: boolean }>) => Promise<void> }).setM3uUrls([{ url: "https://example.com/playlist.m3u", enabled: true }]);
         expect(manager).toBeDefined();
       }
     });
@@ -166,8 +167,8 @@ describe("config-factory", () => {
       const debugMode = await manager.getConfig("debugMode");
       expect(typeof debugMode).toBe("boolean");
 
-      const m3uUrl = await manager.getConfig("m3uUrl");
-      expect(typeof m3uUrl).toBe("string");
+      const m3uUrls = await manager.getConfig("m3uUrls");
+      expect(Array.isArray(m3uUrls)).toBe(true);
     });
   });
 
@@ -176,7 +177,7 @@ describe("config-factory", () => {
       // Should be able to use the exported singleton
       await expect(configManager.initialize()).resolves.toBeUndefined();
       await expect(configManager.isDebugMode()).resolves.toBeDefined();
-      await expect(configManager.getM3uUrl()).resolves.toBeDefined();
+      await expect(configManager.getM3uUrls()).resolves.toBeDefined();
     });
 
     it("should maintain consistent interface across multiple managers", () => {
@@ -257,7 +258,7 @@ describe("config-factory", () => {
         "getConfig",
         "getAllConfig",
         "isDebugMode",
-        "getM3uUrl",
+        "getM3uUrls",
       ] as const;
 
       requiredMethods.forEach((method) => {
@@ -306,7 +307,7 @@ describe("config-factory", () => {
         // All should implement the IConfigManager interface
         await expect(manager.initialize()).resolves.toBeUndefined();
         expect(typeof (await manager.isDebugMode())).toBe("boolean");
-        expect(typeof (await manager.getM3uUrl())).toBe("string");
+        expect(Array.isArray(await manager.getM3uUrls())).toBe(true);
       }
     });
   });

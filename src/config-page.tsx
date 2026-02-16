@@ -1,5 +1,6 @@
 import { useState, useEffect } from "preact/hooks";
-import { configManager, type AppConfig } from "./config-manager";
+import { configManager } from "./config-factory";
+import { type AppConfig, type PlaylistUrl } from "./config-manager";
 
 export function ConfigPage() {
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -48,8 +49,8 @@ export function ConfigPage() {
       setError(null);
 
       // Save each configuration item
-      await configManager.setDebugMode(config.debugMode);
-      await configManager.setM3uUrl(config.m3uUrl);
+      await configManager.setDebugMode?.(config.debugMode);
+      await configManager.setM3uUrls?.(config.m3uUrls);
 
       window.history.back();
     } catch (err) {
@@ -61,9 +62,35 @@ export function ConfigPage() {
     }
   };
 
-  const handleInputChange = (key: keyof AppConfig, value: string | boolean) => {
+  const handleInputChange = (key: keyof AppConfig, value: string | boolean | PlaylistUrl[]) => {
     if (!config) return;
     setConfig({ ...config, [key]: value });
+  };
+
+  const handleAddUrl = () => {
+    if (!config || config.m3uUrls.length >= 10) return;
+    const newUrls = [...config.m3uUrls, { url: "", enabled: true }];
+    handleInputChange("m3uUrls", newUrls);
+  };
+
+  const handleRemoveUrl = (index: number) => {
+    if (!config) return;
+    const newUrls = config.m3uUrls.filter((_, i) => i !== index);
+    handleInputChange("m3uUrls", newUrls);
+  };
+
+  const handleUrlChange = (index: number, value: string) => {
+    if (!config) return;
+    const newUrls = [...config.m3uUrls];
+    newUrls[index] = { ...newUrls[index], url: value };
+    handleInputChange("m3uUrls", newUrls);
+  };
+
+  const handleToggleUrl = (index: number) => {
+    if (!config) return;
+    const newUrls = [...config.m3uUrls];
+    newUrls[index] = { ...newUrls[index], enabled: !newUrls[index].enabled };
+    handleInputChange("m3uUrls", newUrls);
   };
 
   if (loading) {
@@ -118,22 +145,64 @@ export function ConfigPage() {
             <h2 className="mb-6 text-2xl font-semibold">Playlist Settings</h2>
 
             <div>
-              <label htmlFor="m3uUrl">M3U Playlist URL</label>
-              <input
-                id="m3uUrl"
-                type="url"
-                value={config?.m3uUrl || ""}
-                onChange={(e) =>
-                  handleInputChange(
-                    "m3uUrl",
-                    (e.target as HTMLInputElement).value
-                  )
-                }
-                placeholder="https://example.com/playlist.m3u"
-                className="w-full rounded-md border bg-gray-700 p-3"
-              />
-              <p className="p-2 pl-4 text-sm text-gray-400">
-                Enter the URL of your IPTV M3U playlist file
+              <label className="mb-2 block font-medium">M3U Playlist URLs</label>
+              
+              {config?.m3uUrls.length === 0 ? (
+                <p className="mb-4 text-sm text-gray-400">
+                  No playlist URLs configured. Click "Add URL" to add your first playlist.
+                </p>
+              ) : (
+                <div className="mb-4 space-y-3">
+                  {config?.m3uUrls.map((item, index) => (
+                    <div key={index} className="flex gap-2 items-center">
+                      <input
+                        type="url"
+                        value={item.url}
+                        onChange={(e) =>
+                          handleUrlChange(index, (e.target as HTMLInputElement).value)
+                        }
+                        placeholder="https://example.com/playlist.m3u"
+                        className={`flex-1 rounded-md border bg-gray-700 p-3 ${
+                          !item.enabled ? "opacity-60" : ""
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleToggleUrl(index)}
+                        className={`flex-shrink-0 px-4 py-3 rounded-md font-medium ${
+                          item.enabled
+                            ? "bg-green-600 hover:bg-green-500"
+                            : "bg-gray-600 hover:bg-gray-500"
+                        }`}
+                        disabled={saving}
+                        title={item.enabled ? "Enabled" : "Disabled"}
+                      >
+                        {item.enabled ? "Disable" : "Enable"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveUrl(index)}
+                        className="cursor-pointer rounded-md bg-red-600 px-4 py-3 hover:bg-red-500"
+                        disabled={saving}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleAddUrl}
+                className="cursor-pointer rounded-md bg-green-600 px-4 py-2 hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={saving || (config?.m3uUrls.length ?? 0) >= 10}
+              >
+                Add URL {config?.m3uUrls.length ?? 0}/10
+              </button>
+
+              <p className="mt-2 p-2 pl-4 text-sm text-gray-400">
+                Add up to 10 M3U playlist URLs. All playlists will be merged together.
               </p>
             </div>
           </div>

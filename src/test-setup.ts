@@ -1,5 +1,6 @@
 // Test setup file for Vitest
 import { vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
 
 // Mock webOS global object for testing
 const mockWebOS = {
