@@ -1,5 +1,6 @@
 import { useState, useEffect } from "preact/hooks";
-import { configManager, type AppConfig, type PlaylistUrl } from "./config-manager";
+import { configManager } from "./config-factory";
+import { type AppConfig, type PlaylistUrl } from "./config-manager";
 
 export function ConfigPage() {
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -48,8 +49,8 @@ export function ConfigPage() {
       setError(null);
 
       // Save each configuration item
-      await configManager.setDebugMode(config.debugMode);
-      await configManager.setM3uUrls(config.m3uUrls);
+      await configManager.setDebugMode?.(config.debugMode);
+      await configManager.setM3uUrls?.(config.m3uUrls);
 
       window.history.back();
     } catch (err) {
