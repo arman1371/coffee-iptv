@@ -64,12 +64,20 @@ export function App() {
       await configManager.initialize();
       const m3uUrls = await configManager.getM3uUrls();
 
-      // Filter to get only enabled URLs (filtering of empty URLs handled by m3uManager)
+      // Filter to get only enabled URLs
       const enabledUrls = m3uUrls
         .filter(item => item.enabled)
         .map(item => item.url);
 
-      // Download and merge all M3U playlists (filtering handled by m3uManager)
+      // Check if there are any enabled URLs before proceeding
+      if (enabledUrls.length === 0) {
+        setError(
+          "No playlists configured — add or enable a playlist in settings to continue"
+        );
+        return;
+      }
+
+      // Download and merge all M3U playlists (filtering of empty URLs handled by m3uManager)
       const result = await m3uManager.downloadAndMergeMultipleM3U(enabledUrls);
 
       if (!result.success || !result.playlist) {
