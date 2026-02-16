@@ -138,7 +138,10 @@ describe("DevConfigManager", () => {
     it("should return a copy of config not reference", async () => {
       const mockConfig = {
         debugMode: true,
-        m3uUrls: [],
+        m3uUrls: [
+          { url: "https://example.com/playlist1.m3u", enabled: true },
+          { url: "https://example.com/playlist2.m3u", enabled: false },
+        ],
       };
 
       mockFetch.mockResolvedValueOnce({
@@ -151,6 +154,13 @@ describe("DevConfigManager", () => {
 
       expect(config1).toEqual(config2);
       expect(config1).not.toBe(config2); // Different objects
+      
+      // Verify deep clone: mutate nested array in config1
+      config1.m3uUrls.push({ url: "https://example.com/new.m3u", enabled: true });
+      
+      // config2 should be unaffected
+      expect(config2.m3uUrls).toHaveLength(2);
+      expect(config1.m3uUrls).toHaveLength(3);
     });
   });
 

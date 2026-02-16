@@ -53,7 +53,7 @@ export class DevConfigManager implements IConfigManager {
    */
   async getAllConfig(): Promise<AppConfig> {
     await this.ensureInitialized();
-    return { ...this.config };
+    return structuredClone(this.config);
   }
 
   /**
