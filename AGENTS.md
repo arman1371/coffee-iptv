@@ -175,7 +175,7 @@ coffee-iptv/
 
 **Configuration Options**:
 
-- **M3U Playlist URL**: IPTV playlist source
+- **M3U Playlist URLs**: Multiple IPTV playlist sources (up to 10)
 - **Debug Mode**: Enable console debugging
 
 **Features**:
@@ -185,6 +185,9 @@ coffee-iptv/
 - Error display
 - Loading states
 - History API back navigation
+- Add/Remove playlist URLs (max 10)
+- Enable/Disable individual playlists
+- Playlist URL management UI
 
 **Data Flow**:
 
@@ -192,6 +195,14 @@ coffee-iptv/
 2. Display in form with local state
 3. On save: Write to ConfigManager → Navigate back
 4. On cancel: Discard changes → Navigate back
+
+**Playlist Management**:
+
+- Users can add up to 10 playlist URLs
+- Each URL can be individually enabled/disabled
+- Disabled playlists are skipped during loading
+- All enabled playlists are merged together
+- UI provides visual feedback for enabled/disabled state
 
 ---
 
@@ -245,9 +256,14 @@ export function createConfigManager(): IConfigManager {
 **Interface**:
 
 ```typescript
+interface PlaylistUrl {
+  url: string;
+  enabled: boolean;
+}
+
 interface AppConfig {
   debugMode: boolean;
-  m3uUrl: string;
+  m3uUrls: PlaylistUrl[];
 }
 ```
 
@@ -259,8 +275,8 @@ interface AppConfig {
 - `getAllConfig()`: Get all config as object
 - `isDebugMode()`: Convenience getter
 - `setDebugMode(enabled)`: Convenience setter
-- `getM3uUrl()`: Convenience getter
-- `setM3uUrl(url)`: Convenience setter
+- `getM3uUrls()`: Convenience getter for playlist URLs array
+- `setM3uUrls(urls)`: Convenience setter for playlist URLs array
 
 **DB8 Kind**:
 
@@ -274,7 +290,7 @@ interface AppConfig {
 ```typescript
 {
   debugMode: false,
-  m3uUrl: ""
+  m3uUrls: []
 }
 ```
 
@@ -398,6 +414,19 @@ interface M3UPlaylist {
    - Most commonly used method
    - Returns: `M3UParseResult`
 
+4. **`downloadAndMergeMultipleM3U(urls, timeout?)`**
+   - Downloads and merges multiple M3U playlists
+   - Downloads all URLs in parallel using Promise.allSettled
+   - Deduplicates channels by URL (first occurrence wins)
+   - Merges all groups from all playlists
+   - Filters out empty/whitespace URLs
+   - Continues merging even if some URLs fail
+   - Returns error only if all URLs fail
+   - Parameters:
+     - `urls`: Array of M3U playlist URLs
+     - `timeout`: Optional timeout per download
+   - Returns: `M3UParseResult` with merged playlist
+
 **EXTINF Parsing**:
 
 - Extracts tvg-id, tvg-name, tvg-logo
@@ -405,6 +434,15 @@ interface M3UPlaylist {
 - Extracts language, country
 - Parses all attributes into key-value pairs
 - Generates unique channel ID from URL
+- Groups are sorted alphabetically (locale-aware)
+
+**Playlist Merging**:
+
+- Multiple playlists can be merged into one
+- Deduplication based on channel URL
+- First occurrence of duplicate URL takes priority
+- All unique groups are collected and sorted
+- Metadata indicates merged source count
 
 **Error Handling**:
 
