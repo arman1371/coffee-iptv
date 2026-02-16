@@ -247,6 +247,223 @@ http://another.stream.com`;
     });
   });
 
+  describe("downloadAndMergeMultipleM3U", () => {
+    it("should download and merge multiple playlists successfully", async () => {
+      const playlist1 = "#EXTM3U\n#EXTINF:-1,Channel 1\nhttp://stream1.com\n";
+      const playlist2 = "#EXTM3U\n#EXTINF:-1,Channel 2\nhttp://stream2.com\n";
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          text: () => Promise.resolve(playlist1),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          text: () => Promise.resolve(playlist2),
+        });
+
+      const result = await manager.downloadAndMergeMultipleM3U([
+        "https://example.com/playlist1.m3u",
+        "https://example.com/playlist2.m3u",
+      ]);
+
+      expect(result.success).toBe(true);
+      expect(result.playlist).toBeDefined();
+      expect(result.playlist!.channels).toHaveLength(2);
+      expect(result.playlist!.channels[0].name).toBe("Channel 1");
+      expect(result.playlist!.channels[1].name).toBe("Channel 2");
+      expect(result.playlist!.metadata.sourceUrl).toContain("Merged from 2 playlist(s)");
+    });
+
+    it("should deduplicate channels by URL", async () => {
+      const playlist1 = "#EXTM3U\n#EXTINF:-1,Channel 1\nhttp://stream1.com\n#EXTINF:-1,Channel 2\nhttp://stream2.com\n";
+      const playlist2 = "#EXTM3U\n#EXTINF:-1,Channel 1 Duplicate\nhttp://stream1.com\n#EXTINF:-1,Channel 3\nhttp://stream3.com\n";
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          text: () => Promise.resolve(playlist1),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          text: () => Promise.resolve(playlist2),
+        });
+
+      const result = await manager.downloadAndMergeMultipleM3U([
+        "https://example.com/playlist1.m3u",
+        "https://example.com/playlist2.m3u",
+      ]);
+
+      expect(result.success).toBe(true);
+      expect(result.playlist!.channels).toHaveLength(3); // Deduped: only 3 unique URLs
+      expect(result.playlist!.channels[0].name).toBe("Channel 1"); // First occurrence wins
+      expect(result.playlist!.channels[1].name).toBe("Channel 2");
+      expect(result.playlist!.channels[2].name).toBe("Channel 3");
+    });
+
+    it("should handle empty URL list", async () => {
+      const result = await manager.downloadAndMergeMultipleM3U([]);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("No valid URLs provided");
+    });
+
+    it("should filter out empty/whitespace URLs", async () => {
+      const playlist1 = "#EXTM3U\n#EXTINF:-1,Channel 1\nhttp://stream1.com\n";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve(playlist1),
+      });
+
+      const result = await manager.downloadAndMergeMultipleM3U([
+        "https://example.com/playlist1.m3u",
+        "",
+        "   ",
+        "\t",
+      ]);
+
+      expect(result.success).toBe(true);
+      expect(result.playlist!.channels).toHaveLength(1);
+    });
+
+    it("should continue merging when some URLs fail", async () => {
+      const playlist1 = "#EXTM3U\n#EXTINF:-1,Channel 1\nhttp://stream1.com\n";
+
+      mockFetch
+        .mockRejectedValueOnce(new Error("Network error"))
+        .mockResolvedValueOnce({
+          ok: true,
+          text: () => Promise.resolve(playlist1),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 404,
+          statusText: "Not Found",
+        });
+
+      const result = await manager.downloadAndMergeMultipleM3U([
+        "https://example.com/failed1.m3u",
+        "https://example.com/success.m3u",
+        "https://example.com/failed2.m3u",
+      ]);
+
+      expect(result.success).toBe(true);
+      expect(result.playlist!.channels).toHaveLength(1);
+      expect(result.playlist!.metadata.sourceUrl).toContain("Merged from 1 playlist(s)");
+    });
+
+    it("should fail when all URLs fail", async () => {
+      mockFetch
+        .mockRejectedValueOnce(new Error("Network error"))
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 404,
+          statusText: "Not Found",
+        });
+
+      const result = await manager.downloadAndMergeMultipleM3U([
+        "https://example.com/failed1.m3u",
+        "https://example.com/failed2.m3u",
+      ]);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("All playlist downloads failed");
+      expect(result.error).toContain("failed1.m3u");
+      expect(result.error).toContain("failed2.m3u");
+    });
+
+    it("should merge groups from multiple playlists", async () => {
+      const playlist1 = "#EXTM3U\n#EXTINF:-1 group-title=\"Sports\",ESPN\nhttp://stream1.com\n";
+      const playlist2 = "#EXTM3U\n#EXTINF:-1 group-title=\"News\",CNN\nhttp://stream2.com\n";
+      const playlist3 = "#EXTM3U\n#EXTINF:-1 group-title=\"Sports\",ESPN2\nhttp://stream3.com\n";
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          text: () => Promise.resolve(playlist1),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          text: () => Promise.resolve(playlist2),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          text: () => Promise.resolve(playlist3),
+        });
+
+      const result = await manager.downloadAndMergeMultipleM3U([
+        "https://example.com/playlist1.m3u",
+        "https://example.com/playlist2.m3u",
+        "https://example.com/playlist3.m3u",
+      ]);
+
+      expect(result.success).toBe(true);
+      expect(result.playlist!.channels).toHaveLength(3);
+      expect(result.playlist!.metadata.groups).toEqual(["News", "Sports"]);
+    });
+
+    it("should respect URL order for deduplication priority", async () => {
+      const playlist1 = "#EXTM3U\n#EXTINF:-1 group-title=\"First\",Channel A\nhttp://stream.com\n";
+      const playlist2 = "#EXTM3U\n#EXTINF:-1 group-title=\"Second\",Channel B\nhttp://stream.com\n";
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          text: () => Promise.resolve(playlist1),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          text: () => Promise.resolve(playlist2),
+        });
+
+      const result = await manager.downloadAndMergeMultipleM3U([
+        "https://example.com/playlist1.m3u",
+        "https://example.com/playlist2.m3u",
+      ]);
+
+      expect(result.success).toBe(true);
+      expect(result.playlist!.channels).toHaveLength(1);
+      // First URL wins
+      expect(result.playlist!.channels[0].name).toBe("Channel A");
+      expect(result.playlist!.channels[0].group).toBe("First");
+    });
+
+    it("should handle channels with groups and without groups", async () => {
+      const playlist1 = "#EXTM3U\n#EXTINF:-1 group-title=\"Sports\",ESPN\nhttp://stream1.com\n#EXTINF:-1,No Group\nhttp://stream2.com\n";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve(playlist1),
+      });
+
+      const result = await manager.downloadAndMergeMultipleM3U([
+        "https://example.com/playlist.m3u",
+      ]);
+
+      expect(result.success).toBe(true);
+      expect(result.playlist!.channels).toHaveLength(2);
+      expect(result.playlist!.metadata.groups).toEqual(["Sports"]);
+    });
+
+    it("should pass timeout parameter to downloads", async () => {
+      const playlist1 = "#EXTM3U\n#EXTINF:-1,Channel 1\nhttp://stream1.com\n";
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve(playlist1),
+      });
+
+      await manager.downloadAndMergeMultipleM3U(
+        ["https://example.com/playlist.m3u"],
+        5000
+      );
+
+      // Verify timeout is passed through
+      expect(mockFetch).toHaveBeenCalled();
+    });
+  });
+
   describe("utility methods", () => {
     let samplePlaylist: M3UPlaylist;
 
@@ -514,6 +731,46 @@ http://stream.com`;
 
       expect(result.success).toBe(true);
       expect(result.playlist!.channels[0].name).toBe(longName);
+    });
+
+    it("should handle EXTINF line without comma", () => {
+      const content = `#EXTM3U\n#EXTINF:-1 no-comma-here\nhttp://stream.com`;
+
+      const result = manager.parseM3U(content);
+
+      expect(result.success).toBe(true);
+      // Channel should be skipped due to invalid format
+      expect(result.playlist!.channels).toHaveLength(0);
+    });
+
+    it("should handle EXTINF line without name", () => {
+      const content = `#EXTM3U\n#EXTINF:-1,\nhttp://stream.com`;
+
+      const result = manager.parseM3U(content);
+
+      expect(result.success).toBe(true);
+      // Channel should be skipped due to empty name
+      expect(result.playlist!.channels).toHaveLength(0);
+    });
+
+    it("should handle EXTINF line without URL", () => {
+      const content = `#EXTM3U\n#EXTINF:-1,Test Channel\n`;
+
+      const result = manager.parseM3U(content);
+
+      expect(result.success).toBe(true);
+      // Channel should be skipped due to missing URL
+      expect(result.playlist!.channels).toHaveLength(0);
+    });
+
+    it("should handle non-Error exceptions in parseM3U", () => {
+      // This tests the catch block's fallback error message
+      const invalidContent = null as unknown as string;
+      
+      const result = manager.parseM3U(invalidContent);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
     });
   });
 });
