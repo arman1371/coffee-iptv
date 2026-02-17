@@ -1,12 +1,14 @@
 {
   "name": "coffee-iptv",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "test": "vitest run",
     "coverage": "vitest run --coverage",
+    "sync-version": "node scripts/sync-version.js",
+    "prebuild": "npm run sync-version",
     "build": "tsc -b && vite build",
     "prepackage": "npm run build",
     "package": "ares-package -n -o dist dist",
