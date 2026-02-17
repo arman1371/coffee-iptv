@@ -125,6 +125,20 @@ npm run coverage
 
 View the coverage report at `coverage/index.html`
 
+## Automated Releases
+
+This project uses automated releases with semantic versioning.
+
+### Commit Message Format
+
+Use [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+- **`feat: description`** - New feature (triggers **minor** version bump, e.g., 1.0.0 → 1.1.0)
+- **`fix: description`** - Bug fix (triggers **patch** version bump, e.g., 1.0.0 → 1.0.1)
+- **`docs: description`** - Documentation changes (no version bump)
+- **`chore: description`** - Maintenance tasks (no version bump)
+- **`BREAKING CHANGE:`** - Breaking change in footer (triggers **major** version bump, e.g., 1.0.0 → 2.0.0)
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
