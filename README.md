@@ -127,7 +127,7 @@ View the coverage report at `coverage/index.html`
 
 ## Automated Releases
 
-This project uses automated releases with semantic versioning. When you push commits to the `main` branch, the release workflow automatically.
+This project uses automated releases with semantic versioning.
 
 ### Commit Message Format
 
