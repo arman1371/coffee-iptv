@@ -1,5 +1,5 @@
 import { useState, useEffect } from "preact/hooks";
-import { configManager } from "./config-factory";
+import { configManager, notifyConfigChanged } from "./config-factory";
 import { type AppConfig, type PlaylistUrl } from "./config-manager";
 
 export function ConfigPage() {
@@ -52,6 +52,7 @@ export function ConfigPage() {
       await configManager.setDebugMode?.(config.debugMode);
       await configManager.setM3uUrls?.(config.m3uUrls);
 
+      notifyConfigChanged();
       window.history.back();
     } catch (err) {
       setError(

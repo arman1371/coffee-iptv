@@ -27,3 +27,20 @@ export const configManager = createConfigManager();
 
 // Export default for convenience
 export default configManager;
+
+/**
+ * Simple event emitter for config changes.
+ */
+type ConfigChangeListener = () => void;
+const configChangeListeners: Set<ConfigChangeListener> = new Set();
+
+export function onConfigChanged(listener: ConfigChangeListener): () => void {
+  configChangeListeners.add(listener);
+  return () => configChangeListeners.delete(listener);
+}
+
+export function notifyConfigChanged(): void {
+  configChangeListeners.forEach((l) => {
+    l();
+  });
+}

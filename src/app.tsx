@@ -5,6 +5,7 @@ import { Navigation } from "./navigation";
 import { HomePage } from "./home-page";
 import { ConfigPage } from "./config-page";
 import { PlayerPage } from "./player-page";
+import { DebugPanel } from "./debug-panel";
 import "./app.css";
 
 export function App() {
@@ -186,6 +187,7 @@ export function App() {
     <div className="app">
       <Navigation currentPage={currentPage} onNavigate={onNavigate} />
       {renderCurrentPage()}
+      <DebugPanel />
     </div>
   );
 }
