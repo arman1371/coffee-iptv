@@ -345,7 +345,9 @@ describe("config change event emitter", () => {
   const unsubscribers: Array<() => void> = [];
 
   afterEach(() => {
-    unsubscribers.forEach((fn) => fn());
+    unsubscribers.forEach((fn) => {
+      fn();
+    });
     unsubscribers.length = 0;
   });
 
