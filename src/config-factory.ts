@@ -40,5 +40,7 @@ export function onConfigChanged(listener: ConfigChangeListener): () => void {
 }
 
 export function notifyConfigChanged(): void {
-  configChangeListeners.forEach((l) => l());
+  configChangeListeners.forEach((l) => {
+    l();
+  });
 }
