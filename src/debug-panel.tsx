@@ -14,7 +14,9 @@ const logEntries: LogEntry[] = [];
 let logListeners: Array<(entries: LogEntry[]) => void> = [];
 
 function notifyListeners() {
-  logListeners.forEach((l) => l([...logEntries]));
+  logListeners.forEach((l) => {
+    l([...logEntries]);
+  });
 }
 
 function addLogEntry(level: LogEntry["level"], args: unknown[]) {
