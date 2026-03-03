@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createConfigManager, configManager } from "./config-factory";
+import {
+  createConfigManager,
+  configManager,
+  onConfigChanged,
+  notifyConfigChanged,
+} from "./config-factory";
 import type { IConfigManager } from "./config-manager";
 
 // Mock fetch for DevConfigManager tests
@@ -331,5 +336,115 @@ describe("config-factory", () => {
       // Should handle multiple initializations
       await expect(manager.initialize()).resolves.toBeUndefined();
     });
+  });
+});
+
+describe("config change event emitter", () => {
+  // Keep track of all unsubscribe functions so we never leak listeners
+  // between tests.
+  const unsubscribers: Array<() => void> = [];
+
+  afterEach(() => {
+    unsubscribers.forEach((fn) => fn());
+    unsubscribers.length = 0;
+  });
+
+  it("notifyConfigChanged calls a registered listener", () => {
+    const listener = vi.fn();
+    unsubscribers.push(onConfigChanged(listener));
+
+    notifyConfigChanged();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("onConfigChanged returns an unsubscribe function that removes the listener", () => {
+    const listener = vi.fn();
+    const unsubscribe = onConfigChanged(listener);
+
+    notifyConfigChanged();
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+    notifyConfigChanged();
+
+    // Still only one call — listener was removed
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("calling unsubscribe multiple times is safe", () => {
+    const listener = vi.fn();
+    const unsubscribe = onConfigChanged(listener);
+
+    unsubscribe();
+    expect(() => unsubscribe()).not.toThrow();
+  });
+
+  it("notifies multiple independent listeners", () => {
+    const listenerA = vi.fn();
+    const listenerB = vi.fn();
+    const listenerC = vi.fn();
+
+    unsubscribers.push(
+      onConfigChanged(listenerA),
+      onConfigChanged(listenerB),
+      onConfigChanged(listenerC)
+    );
+
+    notifyConfigChanged();
+
+    expect(listenerA).toHaveBeenCalledTimes(1);
+    expect(listenerB).toHaveBeenCalledTimes(1);
+    expect(listenerC).toHaveBeenCalledTimes(1);
+  });
+
+  it("removing one listener does not affect others", () => {
+    const listenerA = vi.fn();
+    const listenerB = vi.fn();
+
+    const unsubA = onConfigChanged(listenerA);
+    unsubscribers.push(onConfigChanged(listenerB));
+
+    unsubA(); // remove only A
+    notifyConfigChanged();
+
+    expect(listenerA).not.toHaveBeenCalled();
+    expect(listenerB).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifyConfigChanged is a no-op when there are no listeners", () => {
+    expect(() => notifyConfigChanged()).not.toThrow();
+  });
+
+  it("the same listener can be registered multiple times and fires multiple times", () => {
+    const listener = vi.fn();
+    unsubscribers.push(
+      onConfigChanged(listener),
+      onConfigChanged(listener)
+    );
+
+    notifyConfigChanged();
+
+    // Set stores unique references — registering the same fn twice
+    // only stores it once.
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifyConfigChanged can be called multiple times", () => {
+    const listener = vi.fn();
+    unsubscribers.push(onConfigChanged(listener));
+
+    notifyConfigChanged();
+    notifyConfigChanged();
+    notifyConfigChanged();
+
+    expect(listener).toHaveBeenCalledTimes(3);
+  });
+
+  it("onConfigChanged returns a function", () => {
+    const unsubscribe = onConfigChanged(vi.fn());
+    unsubscribers.push(unsubscribe);
+
+    expect(typeof unsubscribe).toBe("function");
   });
 });

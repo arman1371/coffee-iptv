@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/preact";
 import { ConfigPage } from "./config-page";
-import { configManager } from "./config-factory";
+import { configManager, notifyConfigChanged } from "./config-factory";
 import type { AppConfig } from "./config-manager";
 
 // Mock the config-factory
@@ -12,6 +12,7 @@ vi.mock("./config-factory", () => ({
     setDebugMode: vi.fn(),
     setM3uUrls: vi.fn(),
   },
+  notifyConfigChanged: vi.fn(),
 }));
 
 describe("ConfigPage", () => {
@@ -355,6 +356,40 @@ describe("ConfigPage", () => {
         expect(configManager.setM3uUrls).toHaveBeenCalledWith(mockConfig.m3uUrls);
         expect(window.history.back).toHaveBeenCalled();
       });
+    });
+
+    it("should call notifyConfigChanged after a successful save", async () => {
+      render(<ConfigPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Save Configuration")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText("Save Configuration"));
+
+      await waitFor(() => {
+        expect(notifyConfigChanged).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it("should not call notifyConfigChanged when save fails", async () => {
+      vi.mocked(configManager.setDebugMode!).mockRejectedValue(
+        new Error("Save failed")
+      );
+
+      render(<ConfigPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Save Configuration")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText("Save Configuration"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Save failed")).toBeInTheDocument();
+      });
+
+      expect(notifyConfigChanged).not.toHaveBeenCalled();
     });
 
     it("should show saving state during save", async () => {

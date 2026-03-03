@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "preact/hooks";
-import { configManager } from "./config-factory";
+import { configManager, onConfigChanged } from "./config-factory";
 
 interface LogEntry {
   level: "log" | "warn" | "error" | "info";
@@ -79,24 +79,29 @@ export function DebugPanel() {
   const logBoxRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
 
-  // Check debug mode from config
   useEffect(() => {
     let cancelled = false;
+
     async function checkDebug() {
       try {
         await configManager.initialize();
         const enabled = await configManager.isDebugMode();
         if (!cancelled) {
-          setDebugEnabled(enabled);
           if (enabled) patchConsole();
+          setDebugEnabled(enabled);
         }
       } catch {
         // silently ignore
       }
     }
+
     checkDebug();
+
+    const unsubscribe = onConfigChanged(checkDebug);
+
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, []);
 
