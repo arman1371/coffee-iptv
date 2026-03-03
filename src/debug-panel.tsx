@@ -158,6 +158,7 @@ export function DebugPanel() {
             onClick={() => {
               logEntries.splice(0, logEntries.length);
               setLogs([]);
+              notifyListeners();
             }}
           >
             Clear
