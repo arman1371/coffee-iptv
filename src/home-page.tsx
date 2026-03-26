@@ -127,6 +127,18 @@ export function HomePage({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [playlist, focusedChannelIndex, onChannelClick, channelsPerRow]);
 
+  // Handle scroll wheel for webOS Magic Remote
+  // webOS doesn't natively scroll the page on wheel events, so we do it manually
+  useEffect(() => {
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      window.scrollBy(0, event.deltaY);
+    };
+
+    document.addEventListener("wheel", handleWheel, { passive: false });
+    return () => document.removeEventListener("wheel", handleWheel);
+  }, []);
+
   // Auto-scroll to focused channel
   useEffect(() => {
     if (!gridRef.current || !playlist || playlist.channels.length === 0) return;
@@ -211,7 +223,7 @@ export function HomePage({
 
   return (
     <div
-      className={`min-h-screen w-full overflow-hidden bg-gray-900 p-6 pt-20 font-sans text-white`}
+      className={`min-h-screen w-full bg-gray-900 p-6 pt-20 font-sans text-white`}
     >
       <main>
         <section
