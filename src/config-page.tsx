@@ -133,7 +133,7 @@ export function ConfigPage() {
 
   return (
     <div
-      className={`min-h-screen w-full overflow-hidden bg-gray-900 p-6 pt-20 font-sans text-white`}
+      className={`h-screen w-full overflow-y-auto bg-gray-900 p-6 pt-20 font-sans text-white`}
     >
       <main>
         {error && (
