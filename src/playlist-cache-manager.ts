@@ -159,5 +159,5 @@ export class PlaylistCacheManager implements IPlaylistCacheManager {
  * Sorts URLs alphabetically and joins them so that order doesn't matter.
  */
 export function computeUrlsHash(urls: string[]): string {
-  return [...urls].sort().join("|");
+  return [...urls].sort((a, b) => a.localeCompare(b)).join("|");
 }
