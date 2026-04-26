@@ -5,7 +5,7 @@
 **Coffee IPTV** is a webOS TV application for viewing IPTV streams. It's built using Preact, TypeScript, and Tailwind CSS, specifically designed for LG webOS Smart TVs with full remote control navigation support.
 
 - **App ID**: `com.arman.coffeeiptv`
-- **Version**: 0.0.1
+- **Version**: 1.1.0
 - **Platform**: LG webOS Smart TV
 - **Primary Tech Stack**: Preact, TypeScript, Vite, Tailwind CSS, HLS.js
 
@@ -40,8 +40,11 @@ coffee-iptv/
 │   ├── icons/                # App icons
 │   └── js/
 │       └── webOSTVjs-1.2.10/ # webOS TV JavaScript SDK
+├── scripts/
+│   └── sync-version.js       # Syncs version from package.json to appinfo.json
 ├── src/
 │   ├── app.tsx               # Main app component with routing
+│   ├── app.css               # Tailwind CSS directives
 │   ├── main.tsx              # Application entry point
 │   ├── navigation.tsx        # Sidebar navigation component
 │   ├── home-page.tsx         # Channel grid page
@@ -49,17 +52,26 @@ coffee-iptv/
 │   ├── config-page.tsx       # Configuration page
 │   ├── config-manager.ts     # Production config manager (DB8)
 │   ├── dev-config-manager.ts # Development config manager (file-based)
-│   ├── config-factory.ts     # Config manager factory
+│   ├── config-factory.ts     # Config manager factory + event emitter
 │   ├── database-manager.ts   # webOS DB8 wrapper
+│   ├── debug-panel.tsx       # On-screen debug console overlay
 │   ├── m3u-manager.ts        # M3U playlist parser
+│   ├── vite-env.d.ts         # Vite environment type definitions
 │   ├── webos-types.d.ts      # TypeScript definitions for webOS
-│   ├── app.css               # Global styles
-│   └── *.test.ts             # Unit tests
+│   ├── test-setup.ts         # Test environment setup
+│   └── *.test.ts(x)          # Unit tests
 ├── coverage/                 # Test coverage reports
+│   └── lcov-report/          # LCOV coverage report
+├── CHANGELOG.md              # Auto-generated changelog (semantic-release)
+├── LICENSE                   # Apache License 2.0
 ├── package.json
 ├── vite.config.ts
-├── tsconfig.json
+├── tsconfig.json             # Project references (tsconfig.app.json + tsconfig.node.json)
+├── tsconfig.app.json         # App TypeScript config
+├── tsconfig.node.json        # Node TypeScript config
+├── postcss.config.js         # PostCSS config (Tailwind + Autoprefixer)
 ├── tailwind.config.js
+├── sonar-project.properties  # SonarQube configuration
 └── eslint.config.js
 ```
 
@@ -74,10 +86,11 @@ coffee-iptv/
 **Key Responsibilities**:
 
 - Client-side routing using History API
-- M3U playlist loading and management
+- M3U playlist loading and management (filters enabled URLs, merges multiple playlists)
 - Channel selection and navigation state
 - Browser back button handling
 - Page rendering logic
+- Renders `<DebugPanel />` overlay component
 
 **State Management**:
 
@@ -85,21 +98,32 @@ coffee-iptv/
 - `playlist`: Loaded M3U playlist data
 - `selectedChannel`: Currently playing channel
 - `selectedChannelIndex`: Index of current channel
-- `lastPlayedChannelIndex`: Resume playback position
+- `lastPlayedChannelIndex`: Passed as `initialFocusIndex` to HomePage for resume position
 - `loading`: Loading state
 - `error`: Error messages
 
 **Key Features**:
 
 - History API integration for back button support
-- Automatic channel resume on return to home
+- Automatic channel resume on return to home (via `initialFocusIndex`)
 - Error handling and retry mechanisms
+- Filters enabled playlist URLs before loading
+- Uses `downloadAndMergeMultipleM3U` for parallel multi-playlist loading
 
 ---
 
 ### 2. Home Page Component (`home-page.tsx`)
 
 **Purpose**: Displays channel grid with TV remote navigation support.
+
+**Props**:
+
+- `playlist`: M3UPlaylist | null
+- `loading`: boolean
+- `error`: string | null
+- `onRetry`: () => void
+- `onChannelClick`: (channel: M3UChannel) => void
+- `initialFocusIndex?`: number (defaults to 0, used to restore last played channel position)
 
 **Key Features**:
 
@@ -188,6 +212,8 @@ coffee-iptv/
 - Add/Remove playlist URLs (max 10)
 - Enable/Disable individual playlists
 - Playlist URL management UI
+- Calls `notifyConfigChanged()` after saving to notify DebugPanel and other listeners
+- Uses optional chaining for setters (`configManager.setDebugMode?.()`) since dev config is read-only
 
 **Data Flow**:
 
@@ -225,11 +251,40 @@ coffee-iptv/
 
 ---
 
-### 6. Configuration Management System
+### 6. Debug Panel Component (`debug-panel.tsx`)
+
+**Purpose**: On-screen debug console overlay that displays console output when debug mode is enabled.
+
+**Key Features**:
+
+- **Console Interception**: Patches `console.log`, `console.warn`, `console.error`, `console.info` globally (once) to capture log entries
+- **Global Log Store**: Shared log buffer (max 200 entries) across all component instances
+- **Auto-scroll**: Automatically scrolls to newest log entries, pauses when user scrolls up
+- **Expand/Collapse**: Toggle panel visibility via toolbar button
+- **Clear Logs**: Clear all log entries from the panel
+- **Config Reactivity**: Subscribes to `onConfigChanged` to re-check debug mode when config is saved
+- **Color-coded Levels**: Different colors for log, info, warn, error levels
+
+**States**:
+
+- `debugEnabled`: Whether debug mode is active (checked on mount and config changes)
+- `logs`: Array of `LogEntry` objects with level, message, and timestamp
+- `isExpanded`: Whether the log area is expanded or collapsed
+
+**Rendering**:
+
+- Returns `null` when debug mode is disabled (no DOM output)
+- Fixed position at bottom of screen with semi-transparent background
+- Toolbar with "Debug Console" label, Clear and Hide/Show buttons
+- Scrollable monospace log area with timestamp and level prefixes
+
+---
+
+### 7. Configuration Management System
 
 #### Config Factory (`config-factory.ts`)
 
-**Purpose**: Factory pattern implementation that selects appropriate config manager based on environment.
+**Purpose**: Factory pattern implementation that selects appropriate config manager based on environment. Also provides a config change event emitter.
 
 ```typescript
 export function createConfigManager(): IConfigManager {
@@ -238,7 +293,16 @@ export function createConfigManager(): IConfigManager {
   }
   return new ConfigManager();
 }
+
+// Singleton instance
+export const configManager = createConfigManager();
 ```
+
+**Config Change Event Emitter**:
+
+- `notifyConfigChanged()`: Call after saving config to notify listeners
+- `onConfigChanged(listener)`: Subscribe to config changes, returns unsubscribe function
+- Used by `DebugPanel` to react to debug mode toggling and by `ConfigPage` after saving
 
 **Environment Detection**:
 
@@ -256,27 +320,36 @@ export function createConfigManager(): IConfigManager {
 **Interface**:
 
 ```typescript
-interface PlaylistUrl {
+export interface PlaylistUrl {
   url: string;
   enabled: boolean;
 }
 
-interface AppConfig {
+export interface AppConfig {
   debugMode: boolean;
   m3uUrls: PlaylistUrl[];
+  [key: string]: string | boolean | PlaylistUrl[]; // Index signature for dynamic access
 }
+
+export const DEFAULT_CONFIG: AppConfig = {
+  debugMode: false,
+  m3uUrls: [],
+};
 ```
 
 **Key Methods**:
 
-- `initialize()`: Creates DB8 kind/schema
-- `getConfig<K>(key: K)`: Get single config value
-- `setConfig<K>(key: K, value)`: Set single config value
+- `initialize()`: Creates DB8 kind/schema, runs `migrateOldConfig()` for backward compatibility
+- `getConfig<K>(key: K)`: Get single config value (deserializes JSON for array values)
+- `setConfig<K>(key: K, value)`: Set single config value (serializes arrays to JSON for DB8)
 - `getAllConfig()`: Get all config as object
 - `isDebugMode()`: Convenience getter
 - `setDebugMode(enabled)`: Convenience setter
 - `getM3uUrls()`: Convenience getter for playlist URLs array
-- `setM3uUrls(urls)`: Convenience setter for playlist URLs array
+- `setM3uUrls(urls)`: Convenience setter, accepts `PlaylistUrl[] | string[]` for backward compatibility, filters empty URLs, enforces max 10
+- `migrateOldConfig()` (private): Migrates old `m3uUrl` (singular) config to `m3uUrls` (plural) array format
+
+**Note**: In the `IConfigManager` interface, `setConfig`, `setDebugMode`, and `setM3uUrls` are optional (`?`) since `DevConfigManager` is read-only.
 
 **DB8 Kind**:
 
@@ -300,20 +373,20 @@ interface AppConfig {
 
 **Purpose**: Simplified file-based config manager for local development (no DB8 required).
 
-**Storage**: `/public/config.json` file
+**Storage**: `/public/config.json` file (fetched via HTTP)
 
 **Features**:
 
-- Read-only in browser
-- No setConfig methods (development only)
-- Loads from static JSON file
-- Same interface as production manager
+- Read-only: does not implement `setConfig`, `setDebugMode`, `setM3uUrls`
+- Loads from static JSON file via `fetch('/config.json')`
+- Uses `structuredClone` for safe config copies
+- Same `IConfigManager` interface as production manager (optional setters excluded)
 
 **Usage**: Automatically selected when running `npm run dev`
 
 ---
 
-### 7. Database Manager (`database-manager.ts`)
+### 8. Database Manager (`database-manager.ts`)
 
 **Purpose**: Type-safe wrapper around webOS DB8 Luna service.
 
@@ -365,7 +438,7 @@ await dbManager.put([
 
 ---
 
-### 8. M3U Manager (`m3u-manager.ts`)
+### 9. M3U Manager (`m3u-manager.ts`)
 
 **Purpose**: Download and parse M3U/M3U8 playlist files.
 
@@ -592,10 +665,7 @@ cursor-pointer
 
 **File**: `src/app.css`
 
-- Custom fonts
-- Reset styles
-- WebOS-specific adjustments
-- Base component styles
+- Tailwind CSS directives (`@tailwind base`, `@tailwind components`, `@tailwind utilities`)
 
 ---
 
@@ -613,10 +683,13 @@ npm run test
 # Generate coverage report
 npm run coverage
 
-# Build for production
+# Sync version from package.json to appinfo.json
+npm run sync-version
+
+# Build for production (runs sync-version automatically via prebuild)
 npm run build
 
-# Package for webOS
+# Package for webOS (runs build automatically via prepackage)
 npm run package
 
 # Preview production build
@@ -662,6 +735,10 @@ npm run preview
 - `config-manager.test.ts`: Config manager unit tests
 - `database-manager.test.ts`: Database wrapper tests
 - `m3u-manager.test.ts`: M3U parsing tests
+- `config-factory.test.ts`: Config factory unit tests
+- `config-page.test.tsx`: Config page component tests
+- `dev-config-manager.test.ts`: Dev config manager tests
+- `debug-panel.test.tsx`: Debug panel component tests
 - `test-setup.ts`: Test environment setup
 
 ### Running Tests
@@ -682,8 +759,7 @@ open coverage/index.html
 Reports available in `/coverage/` directory:
 
 - HTML report: `coverage/index.html`
-- Clover XML: `coverage/clover.xml`
-- JSON: `coverage/coverage-final.json`
+- LCOV report: `coverage/lcov-report/` and `coverage/lcov.info`
 
 ---
 
@@ -876,12 +952,12 @@ The application intentionally avoids Redux/MobX/etc because:
    npm run package
    ```
 
-   Output: `dist/com.arman.coffeeiptv_0.0.1_all.ipk`
+   Output: `dist/com.arman.coffeeiptv_1.1.0_all.ipk`
 
 3. **Install on Device**:
 
    ```bash
-   ares-install --device <device-name> dist/com.arman.coffeeiptv_0.0.1_all.ipk
+   ares-install --device <device-name> dist/com.arman.coffeeiptv_1.1.0_all.ipk
    ```
 
 4. **Launch Application**:
@@ -906,7 +982,7 @@ ares-device-info --device <device-name>
 
 ```bash
 # Install development build
-ares-install --device <device-name> dist/com.arman.coffeeiptv_0.0.1_all.ipk
+ares-install --device <device-name> dist/com.arman.coffeeiptv_1.1.0_all.ipk
 
 # View logs
 ares-launch --device <device-name> com.arman.coffeeiptv --inspect
@@ -939,15 +1015,17 @@ ares-install --device <device-name> --remove com.arman.coffeeiptv
 **Key Settings**:
 
 - Preact plugin
-- TypeScript checker
+- TypeScript checker (vite-plugin-checker)
 - Base path: `./` (relative for webOS)
 - Jsdom test environment
+- Test setup file: `./src/test-setup.ts`
+- Coverage: v8 provider with html + lcov reporters
 
 ### tsconfig.json
 
 **Compiler Options**:
 
-- Target: ES2020
+- Target: ES2022
 - Module: ESNext
 - JSX: react-jsx with Preact
 - Strict mode enabled
@@ -968,12 +1046,10 @@ ares-install --device <device-name> --remove com.arman.coffeeiptv
 
 ### eslint.config.js
 
-**Extends**:
+**Uses flat config** (`tseslint.config()`):
 
-- ESLint recommended
-- TypeScript ESLint
-- Preact recommended
-- Prettier integration
+- Ignores: `public/js/webOSTVjs-1.2.10/**`, `dist`
+- Extends: eslint-config-preact, typescript-eslint recommended, eslint-config-prettier (flat)
 
 ---
 
@@ -1093,17 +1169,29 @@ Check console for:
 
 ### Development Dependencies
 
-| Package             | Purpose                       |
-| ------------------- | ----------------------------- |
-| @preact/preset-vite | Vite integration for Preact   |
-| typescript          | Type checking and compilation |
-| vite                | Build tool and dev server     |
-| vitest              | Unit testing framework        |
-| @vitest/coverage-v8 | Code coverage reporting       |
-| tailwindcss         | Utility-first CSS framework   |
-| eslint              | Code linting                  |
-| prettier            | Code formatting               |
-| jsdom               | DOM implementation for tests  |
+| Package                    | Purpose                            |
+| -------------------------- | ---------------------------------- |
+| @preact/preset-vite        | Vite integration for Preact        |
+| typescript                 | Type checking and compilation      |
+| vite                       | Build tool and dev server          |
+| vite-plugin-checker        | TypeScript checking during dev     |
+| vitest                     | Unit testing framework             |
+| @vitest/coverage-v8        | Code coverage reporting            |
+| @vitest/ui                 | Vitest UI runner                   |
+| @testing-library/preact    | Component testing utilities        |
+| @testing-library/jest-dom  | Custom DOM matchers for tests      |
+| tailwindcss                | Utility-first CSS framework        |
+| autoprefixer               | PostCSS autoprefixer plugin        |
+| postcss                    | CSS transformation tool            |
+| eslint                     | Code linting                       |
+| eslint-config-preact       | ESLint config for Preact           |
+| eslint-config-prettier     | Prettier-compatible ESLint config  |
+| typescript-eslint          | TypeScript ESLint integration      |
+| prettier                   | Code formatting                    |
+| prettier-plugin-tailwindcss| Tailwind class sorting in Prettier |
+| jsdom                      | DOM implementation for tests       |
+| semantic-release           | Automated versioning and releases  |
+| @semantic-release/*        | Semantic-release plugins           |
 
 ---
 
@@ -1122,6 +1210,18 @@ class M3UManager {
   // Download and parse in one call
   downloadAndParseM3U(url: string, timeout?: number): Promise<M3UParseResult>;
 
+  // Download, merge, and deduplicate multiple M3U playlists
+  downloadAndMergeMultipleM3U(urls: string[], timeout?: number): Promise<M3UParseResult>;
+
+  // Get channels filtered by group
+  getChannelsByGroup(playlist: M3UPlaylist, groupName: string): M3UChannel[];
+
+  // Search channels by name
+  searchChannels(playlist: M3UPlaylist, query: string): M3UChannel[];
+
+  // Get playlist statistics
+  getPlaylistStats(playlist: M3UPlaylist): PlaylistStats;
+
   // Validate URL format
   private isValidUrl(url: string): boolean;
 
@@ -1139,12 +1239,12 @@ class M3UManager {
 interface IConfigManager {
   initialize(): Promise<void>;
   getConfig<K>(key: K): Promise<AppConfig[K]>;
-  setConfig<K>(key: K, value: AppConfig[K]): Promise<void>;
+  setConfig?<K>(key: K, value: AppConfig[K]): Promise<void>;
   getAllConfig(): Promise<AppConfig>;
   isDebugMode(): Promise<boolean>;
-  setDebugMode(enabled: boolean): Promise<void>;
-  getM3uUrl(): Promise<string>;
-  setM3uUrl(url: string): Promise<void>;
+  setDebugMode?(enabled: boolean): Promise<void>;
+  getM3uUrls(): Promise<PlaylistUrl[]>;
+  setM3uUrls?(urls: PlaylistUrl[] | string[]): Promise<void>;
 }
 ```
 
@@ -1185,10 +1285,10 @@ class DatabaseManager {
 
 ### File Naming
 
-- **Components**: PascalCase + `.tsx` (e.g., `HomePage.tsx`)
+- **Components**: kebab-case + `.tsx` (e.g., `home-page.tsx`)
 - **Utilities**: kebab-case + `.ts` (e.g., `m3u-manager.ts`)
 - **Types**: `.d.ts` for type definitions
-- **Tests**: `.test.ts` suffix
+- **Tests**: `.test.ts` or `.test.tsx` suffix
 
 ### Code Organization
 
@@ -1247,7 +1347,7 @@ export function Component(props: Props) {
 
 ## License
 
-Not specified in the project. Consider adding a LICENSE file.
+Apache License 2.0 (see `LICENSE` file).
 
 ---
 
@@ -1260,15 +1360,21 @@ Not specified in the project. Consider adding a LICENSE file.
 
 ## Changelog
 
-### Version 0.0.1 (Current)
+### Version 1.1.0 (Current)
+
+- Added debug panel in UI (#10)
+
+### Version 1.0.0
 
 - Initial release
 - Basic IPTV playback functionality
-- M3U playlist support
+- M3U playlist support (multiple playlists with merge/dedup)
 - HLS streaming support
 - Remote control navigation
 - Configuration management
 - webOS DB8 integration
+- Debug panel overlay
+- Multi-playlist URL management with enable/disable
 
 ---
 
