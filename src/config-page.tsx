@@ -1,5 +1,6 @@
 import { useState, useEffect } from "preact/hooks";
 import { configManager, notifyConfigChanged } from "./config-factory";
+import { playlistCacheManager } from "./playlist-cache-factory";
 import { type AppConfig, type PlaylistUrl } from "./config-manager";
 
 export function ConfigPage() {
@@ -51,6 +52,7 @@ export function ConfigPage() {
       // Save each configuration item
       await configManager.setDebugMode?.(config.debugMode);
       await configManager.setM3uUrls?.(config.m3uUrls);
+      await configManager.setCacheRefreshHours?.(config.cacheRefreshHours);
 
       notifyConfigChanged();
       window.history.back();
@@ -63,7 +65,7 @@ export function ConfigPage() {
     }
   };
 
-  const handleInputChange = (key: keyof AppConfig, value: string | boolean | PlaylistUrl[]) => {
+  const handleInputChange = (key: keyof AppConfig, value: string | boolean | number | PlaylistUrl[]) => {
     if (!config) return;
     setConfig({ ...config, [key]: value });
   };
@@ -206,6 +208,56 @@ export function ConfigPage() {
                 Add up to 10 M3U playlist URLs. All playlists will be merged together.
               </p>
             </div>
+          </div>
+
+          <div className="mb-5 rounded-md bg-gray-800 p-6">
+            <h2 className="mb-6 text-2xl font-semibold">Cache Settings</h2>
+
+            <div className="mb-4">
+              <label className="mb-2 block font-medium">
+                Refresh interval (hours)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="720"
+                step="1"
+                value={config?.cacheRefreshHours ?? 24}
+                onChange={(e) => {
+                  const val = parseInt(
+                    (e.target as HTMLInputElement).value,
+                    10
+                  );
+                  if (!isNaN(val)) {
+                    handleInputChange(
+                      "cacheRefreshHours",
+                      Math.max(0, Math.min(720, val))
+                    );
+                  }
+                }}
+                className="w-32 rounded-md border bg-gray-700 p-3"
+                disabled={saving}
+              />
+              <p className="mt-2 p-2 pl-4 text-sm text-gray-400">
+                How often to re-download playlists. Set to 0 to always download
+                fresh. Maximum 720 hours (30 days).
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={async () => {
+                await playlistCacheManager.initialize();
+                await playlistCacheManager.clearCache();
+              }}
+              className="cursor-pointer rounded-md bg-red-600 px-4 py-2 hover:bg-red-500"
+              disabled={saving}
+            >
+              Clear Cache Now
+            </button>
+            <p className="mt-2 p-2 pl-4 text-sm text-gray-400">
+              Force the next load to download playlists fresh from the network.
+            </p>
           </div>
 
           <div className="mb-5 rounded-md bg-gray-800 p-6">

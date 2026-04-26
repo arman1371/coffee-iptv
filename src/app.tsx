@@ -1,5 +1,7 @@
 import { useState, useEffect } from "preact/hooks";
 import { configManager } from "./config-factory";
+import { playlistCacheManager } from "./playlist-cache-factory";
+import { computeUrlsHash } from "./playlist-cache-manager";
 import { m3uManager, type M3UPlaylist, type M3UChannel } from "./m3u-manager";
 import { Navigation } from "./navigation";
 import { HomePage } from "./home-page";
@@ -78,12 +80,33 @@ export function App() {
         return;
       }
 
+      // Check playlist cache before downloading
+      const cacheRefreshHours = await configManager.getCacheRefreshHours();
+      if (cacheRefreshHours > 0) {
+        await playlistCacheManager.initialize();
+        const urlsHash = computeUrlsHash(enabledUrls);
+        const cached = await playlistCacheManager.getCachedPlaylist(
+          urlsHash,
+          cacheRefreshHours
+        );
+        if (cached) {
+          setPlaylist(cached);
+          return;
+        }
+      }
+
       // Download and merge all M3U playlists (filtering of empty URLs handled by m3uManager)
       const result = await m3uManager.downloadAndMergeMultipleM3U(enabledUrls);
 
       if (!result.success || !result.playlist) {
         setError(result.error || "Failed to load playlists");
         return;
+      }
+
+      // Cache the freshly downloaded playlist
+      if (cacheRefreshHours > 0) {
+        const urlsHash = computeUrlsHash(enabledUrls);
+        await playlistCacheManager.cachePlaylist(result.playlist, urlsHash);
       }
 
       setPlaylist(result.playlist);

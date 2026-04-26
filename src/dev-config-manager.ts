@@ -71,6 +71,13 @@ export class DevConfigManager implements IConfigManager {
   }
 
   /**
+   * Get cache refresh interval in hours (convenience method)
+   */
+  async getCacheRefreshHours(): Promise<number> {
+    return await this.getConfig("cacheRefreshHours");
+  }
+
+  /**
    * Ensure the config manager is initialized
    */
   private async ensureInitialized(): Promise<void> {

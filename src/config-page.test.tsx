@@ -11,8 +11,17 @@ vi.mock("./config-factory", () => ({
     getAllConfig: vi.fn(),
     setDebugMode: vi.fn(),
     setM3uUrls: vi.fn(),
+    setCacheRefreshHours: vi.fn(),
   },
   notifyConfigChanged: vi.fn(),
+}));
+
+// Mock the playlist-cache-factory
+vi.mock("./playlist-cache-factory", () => ({
+  playlistCacheManager: {
+    initialize: vi.fn().mockResolvedValue(undefined),
+    clearCache: vi.fn().mockResolvedValue(undefined),
+  },
 }));
 
 describe("ConfigPage", () => {
@@ -22,6 +31,7 @@ describe("ConfigPage", () => {
       { url: "https://example.com/playlist1.m3u", enabled: true },
       { url: "https://example.com/playlist2.m3u", enabled: false },
     ],
+    cacheRefreshHours: 24,
   };
 
   beforeEach(() => {
@@ -234,6 +244,7 @@ describe("ConfigPage", () => {
           url: `https://example.com/playlist${i}.m3u`,
           enabled: true,
         })),
+        cacheRefreshHours: 24,
       };
       vi.mocked(configManager.getAllConfig).mockResolvedValue(maxConfig);
 
@@ -339,6 +350,7 @@ describe("ConfigPage", () => {
       vi.mocked(configManager.getAllConfig).mockResolvedValue(mockConfig);
       vi.mocked(configManager.setDebugMode!).mockResolvedValue(undefined);
       vi.mocked(configManager.setM3uUrls!).mockResolvedValue(undefined);
+      vi.mocked(configManager.setCacheRefreshHours!).mockResolvedValue(undefined);
     });
 
     it("should save configuration and navigate back", async () => {
@@ -354,6 +366,7 @@ describe("ConfigPage", () => {
       await waitFor(() => {
         expect(configManager.setDebugMode).toHaveBeenCalledWith(false);
         expect(configManager.setM3uUrls).toHaveBeenCalledWith(mockConfig.m3uUrls);
+        expect(configManager.setCacheRefreshHours).toHaveBeenCalledWith(24);
         expect(window.history.back).toHaveBeenCalled();
       });
     });
@@ -557,6 +570,7 @@ describe("ConfigPage", () => {
       vi.mocked(configManager.getAllConfig).mockResolvedValue({
         debugMode: false,
         m3uUrls: [],
+        cacheRefreshHours: 24,
       });
 
       render(<ConfigPage />);
@@ -573,6 +587,7 @@ describe("ConfigPage", () => {
           url: `https://example.com/playlist${i}.m3u`,
           enabled: true,
         })),
+        cacheRefreshHours: 24,
       };
       vi.mocked(configManager.initialize).mockResolvedValue(undefined);
       vi.mocked(configManager.getAllConfig).mockResolvedValue(maxConfig);
@@ -582,6 +597,58 @@ describe("ConfigPage", () => {
       await waitFor(() => {
         const addButton = screen.getByText("Add URL 10/10");
         expect(addButton).toBeDisabled();
+      });
+    });
+  });
+
+  describe("Cache Settings", () => {
+    beforeEach(async () => {
+      vi.mocked(configManager.initialize).mockResolvedValue(undefined);
+      vi.mocked(configManager.getAllConfig).mockResolvedValue(mockConfig);
+    });
+
+    it("should display cache refresh hours input", async () => {
+      render(<ConfigPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Cache Settings")).toBeInTheDocument();
+        expect(screen.getByText("Refresh interval (hours)")).toBeInTheDocument();
+      });
+    });
+
+    it("should display current cache refresh hours value", async () => {
+      render(<ConfigPage />);
+
+      await waitFor(() => {
+        const input = screen.getByDisplayValue("24") as HTMLInputElement;
+        expect(input).toBeInTheDocument();
+        expect(input.type).toBe("number");
+      });
+    });
+
+    it("should display Clear Cache Now button", async () => {
+      render(<ConfigPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Clear Cache Now")).toBeInTheDocument();
+      });
+    });
+
+    it("should save cache refresh hours on save", async () => {
+      vi.mocked(configManager.setDebugMode!).mockResolvedValue(undefined);
+      vi.mocked(configManager.setM3uUrls!).mockResolvedValue(undefined);
+      vi.mocked(configManager.setCacheRefreshHours!).mockResolvedValue(undefined);
+
+      render(<ConfigPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Save Configuration")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText("Save Configuration"));
+
+      await waitFor(() => {
+        expect(configManager.setCacheRefreshHours).toHaveBeenCalledWith(24);
       });
     });
   });

@@ -11,13 +11,14 @@ export interface PlaylistUrl {
 export interface AppConfig {
   debugMode: boolean;
   m3uUrls: PlaylistUrl[];
-  [key: string]: string | boolean | PlaylistUrl[]; // Index signature to allow dynamic property access
+  cacheRefreshHours: number;
+  [key: string]: string | boolean | number | PlaylistUrl[]; // Index signature to allow dynamic property access
 }
 
 export interface ConfigEntry extends DB8Object {
   _kind: "com.arman.coffeeiptv.config:1";
   key: string;
-  value: string | boolean;
+  value: string | boolean | number;
   updatedAt: string;
 }
 
@@ -25,6 +26,7 @@ export interface ConfigEntry extends DB8Object {
 export const DEFAULT_CONFIG: AppConfig = {
   debugMode: false,
   m3uUrls: [],
+  cacheRefreshHours: 24,
 };
 
 // Interface for config manager implementations
@@ -40,6 +42,8 @@ export interface IConfigManager {
   setDebugMode?(enabled: boolean): Promise<void>;
   getM3uUrls(): Promise<PlaylistUrl[]>;
   setM3uUrls?(urls: PlaylistUrl[] | string[]): Promise<void>;
+  getCacheRefreshHours(): Promise<number>;
+  setCacheRefreshHours?(hours: number): Promise<void>;
 }
 
 export class ConfigManager implements IConfigManager {
@@ -147,12 +151,12 @@ export class ConfigManager implements IConfigManager {
       const existingResult = await this.dbManager.find(existingQuery);
 
       // Serialize arrays to JSON strings for DB8 storage
-      const serializedValue = Array.isArray(value) ? JSON.stringify(value) : value;
+      const serializedValue = Array.isArray(value) ? JSON.stringify(value) : value as string | boolean | number;
 
       const configEntry: ConfigEntry = {
         _kind: this.configKindId,
         key: key as string,
-        value: serializedValue as string | boolean,
+        value: serializedValue as string | boolean | number,
         updatedAt: new Date().toISOString(),
       };
 
@@ -255,6 +259,20 @@ export class ConfigManager implements IConfigManager {
       .slice(0, 10); // Enforce max 10 URLs
     
     await this.setConfig("m3uUrls", cleanedUrls);
+  }
+
+  /**
+   * Get cache refresh interval in hours (convenience method)
+   */
+  async getCacheRefreshHours(): Promise<number> {
+    return await this.getConfig("cacheRefreshHours");
+  }
+
+  /**
+   * Set cache refresh interval in hours (convenience method)
+   */
+  async setCacheRefreshHours(hours: number): Promise<void> {
+    await this.setConfig("cacheRefreshHours", hours);
   }
 
   /**

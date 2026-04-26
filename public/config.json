@@ -5,5 +5,6 @@
       "url": "https://iptv-org.github.io/iptv/categories/animation.m3u",
       "enabled": true
     }
-  ]
+  ],
+  "cacheRefreshHours": 24
 }
