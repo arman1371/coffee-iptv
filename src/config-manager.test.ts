@@ -333,6 +333,7 @@ describe("ConfigManager", () => {
       expect(result).toEqual({
         debugMode: true,
         m3uUrls: [{ url: "https://example.com/playlist.m3u", enabled: true }],
+        cacheRefreshHours: 24,
       });
     });
 
@@ -361,6 +362,7 @@ describe("ConfigManager", () => {
       expect(result).toEqual({
         debugMode: false,
         m3uUrls: [],
+        cacheRefreshHours: 24,
       });
     });
   });
@@ -448,6 +450,58 @@ describe("ConfigManager", () => {
 
       await testConfigManager.setM3uUrls([{ url: "https://new-url.com/playlist.m3u", enabled: false }]);
       expect(mockDatabaseManager.put).toHaveBeenCalled();
+    });
+
+    it("should handle cache refresh hours methods", async () => {
+      const mockQuery: DB8Query = {
+        from: "com.arman.coffeeiptv.config:1",
+        where: [{ prop: "key", op: "=", val: "cacheRefreshHours" }],
+      };
+      const mockResponse: DB8SuccessResponse = {
+        returnValue: true,
+        results: [
+          {
+            _kind: "com.arman.coffeeiptv.config:1",
+            _id: "config3",
+            key: "cacheRefreshHours",
+            value: 48,
+            updatedAt: "2025-08-31T12:00:00Z",
+          },
+        ],
+      };
+
+      vi.mocked(mockDatabaseManager.createQuery).mockReturnValue(mockQuery);
+      vi.mocked(mockDatabaseManager.find).mockResolvedValue(mockResponse);
+
+      const hours = await testConfigManager.getCacheRefreshHours();
+      expect(hours).toBe(48);
+
+      vi.mocked(mockDatabaseManager.find).mockResolvedValue({
+        returnValue: true,
+        results: [],
+      });
+      vi.mocked(mockDatabaseManager.put).mockResolvedValue({
+        returnValue: true,
+      });
+
+      await testConfigManager.setCacheRefreshHours(12);
+      expect(mockDatabaseManager.put).toHaveBeenCalled();
+    });
+
+    it("should return default cache refresh hours when not set", async () => {
+      const mockQuery: DB8Query = {
+        from: "com.arman.coffeeiptv.config:1",
+        where: [{ prop: "key", op: "=", val: "cacheRefreshHours" }],
+      };
+
+      vi.mocked(mockDatabaseManager.createQuery).mockReturnValue(mockQuery);
+      vi.mocked(mockDatabaseManager.find).mockResolvedValue({
+        returnValue: true,
+        results: [],
+      });
+
+      const hours = await testConfigManager.getCacheRefreshHours();
+      expect(hours).toBe(24);
     });
   });
 

@@ -23,6 +23,7 @@ describe("DevConfigManager", () => {
         m3uUrls: [
           { url: "https://example.com/playlist.m3u", enabled: true },
         ],
+        cacheRefreshHours: 24,
       };
 
       mockFetch.mockResolvedValueOnce({
@@ -124,6 +125,7 @@ describe("DevConfigManager", () => {
           { url: "https://example.com/test.m3u", enabled: true },
           { url: "https://example.com/test2.m3u", enabled: false },
         ],
+        cacheRefreshHours: 24,
       };
 
       mockFetch.mockResolvedValueOnce({
@@ -230,6 +232,39 @@ describe("DevConfigManager", () => {
 
       const urls = await devConfigManager.getM3uUrls();
       expect(urls).toEqual([]);
+    });
+  });
+
+  describe("getCacheRefreshHours", () => {
+    it("should return cache refresh hours from config", async () => {
+      const mockConfig = {
+        debugMode: false,
+        m3uUrls: [],
+        cacheRefreshHours: 48,
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockConfig,
+      });
+
+      const hours = await devConfigManager.getCacheRefreshHours();
+      expect(hours).toBe(48);
+    });
+
+    it("should return default when not specified in config file", async () => {
+      const mockConfig = {
+        debugMode: false,
+        m3uUrls: [],
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockConfig,
+      });
+
+      const hours = await devConfigManager.getCacheRefreshHours();
+      expect(hours).toBe(24);
     });
   });
 });

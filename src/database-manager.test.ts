@@ -274,6 +274,71 @@ describe("DatabaseManager", () => {
     });
   });
 
+  describe("del method", () => {
+    it("should delete objects with query", async () => {
+      const mockQuery: DB8Query = {
+        from: "com.test.kind:1",
+      };
+      const mockResponse: DB8SuccessResponse = {
+        returnValue: true,
+        count: 3,
+      };
+
+      mockWebOS.service.request.mockImplementation((_service, options) => {
+        expect(options.method).toBe("del");
+        expect(options.parameters.query).toEqual(mockQuery);
+        options.onSuccess(mockResponse);
+      });
+
+      const result = await databaseManager.del(mockQuery);
+
+      expect(result).toEqual(mockResponse);
+    });
+
+    it("should handle del errors", async () => {
+      const mockQuery: DB8Query = {
+        from: "com.test.kind:1",
+      };
+      const mockError: DB8ErrorResponse = {
+        errorCode: -3963,
+        errorText: "db: permission denied",
+        returnValue: false,
+      };
+
+      mockWebOS.service.request.mockImplementation((_service, options) => {
+        options.onFailure(mockError);
+      });
+
+      await expect(databaseManager.del(mockQuery)).rejects.toEqual(mockError);
+    });
+  });
+
+  describe("constructor serviceUri", () => {
+    it("should use default serviceUri when not specified", async () => {
+      const defaultManager = new DatabaseManager();
+      const mockQuery: DB8Query = { from: "com.test.kind:1" };
+
+      mockWebOS.service.request.mockImplementation((service, options) => {
+        expect(service).toBe("luna://com.palm.db");
+        options.onSuccess({ returnValue: true, results: [] });
+      });
+
+      await defaultManager.find(mockQuery);
+    });
+
+    it("should use custom serviceUri when specified", async () => {
+      const mediaManager = new DatabaseManager("luna://com.webos.mediadb");
+      const mockQuery: DB8Query = { from: "com.test.kind:1" };
+
+      mockWebOS.service.request.mockImplementation((service, options) => {
+        expect(service).toBe("luna://com.webos.mediadb");
+        options.onSuccess({ returnValue: true, results: [] });
+      });
+
+      await mediaManager.find(mockQuery);
+    });
+  });
+
   describe("method chaining and integration", () => {
     it("should work with realistic database workflow", async () => {
       // Create kind

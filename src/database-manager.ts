@@ -43,7 +43,11 @@ export interface DB8Kind {
 }
 
 export class DatabaseManager {
-  private readonly serviceUri = "luna://com.palm.db";
+  private readonly serviceUri: string;
+
+  constructor(serviceUri: string = "luna://com.palm.db") {
+    this.serviceUri = serviceUri;
+  }
 
   /**
    * Returns a set of objects that match the specified query
@@ -105,6 +109,26 @@ export class DatabaseManager {
       window.webOS.service.request(this.serviceUri, {
         method: "putKind",
         parameters,
+        onSuccess: (response: unknown) => {
+          resolve(response as DB8SuccessResponse);
+        },
+        onFailure: (error: unknown) => {
+          reject(error as DB8ErrorResponse);
+        },
+      });
+    });
+  }
+
+  /**
+   * Deletes JSON data objects from the database using a query
+   * @param query DB8 query specifying objects to delete
+   * @returns Promise with deletion results
+   */
+  async del(query: DB8Query): Promise<DB8SuccessResponse> {
+    return new Promise((resolve, reject) => {
+      window.webOS.service.request(this.serviceUri, {
+        method: "del",
+        parameters: { query },
         onSuccess: (response: unknown) => {
           resolve(response as DB8SuccessResponse);
         },
